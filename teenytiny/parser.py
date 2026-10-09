@@ -6,8 +6,8 @@ from lark import Lark, Transformer, Token
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 from .ast import (
-    Binary, Comparison, Goto, Grouped, If, Input, Label, Let, Number, Print,
-    Program, SourceLocation, Unary, Variable, While,
+    Binary, Block, Comparison, Elif, Goto, Grouped, If, Input, Label, Let,
+    Number, Print, Program, SourceLocation, Stmt, Unary, Variable, While,
 )
 from .errors import ParseError
 
@@ -31,11 +31,15 @@ class ASTBuilder(Transformer):
         return items[0]
 
     def program(self, items):
-        stmt_types = (Print, Input, Let, If, While, Label, Goto)
-        return Program(tuple(item for item in items if isinstance(item, stmt_types)))
+        return Program(tuple(item for item in items if isinstance(item, Stmt)))
 
     def statement(self, items):
         return items[0]
+
+    def block(self, items):
+        # LBRACE, statement..., RBRACE. The separators are inlined away.
+        statements = tuple(item for item in items if isinstance(item, Stmt))
+        return Block(statements, _loc(items[0]))
 
     def print_stmt(self, items):
         token = items[0]
@@ -51,15 +55,24 @@ class ASTBuilder(Transformer):
         return Let(str(items[0]), items[1], _loc(items[0]))
 
     def if_stmt(self, items):
-        # IF, comparison, THEN, body..., ENDIF, _NL
-        condition = items[1]
-        body = tuple(x for x in items[3:] if isinstance(x, (Print, Input, Let, If, While, Label, Goto)))
-        return If(condition, body, _loc(items[0]))
+        # IF, comparison, Block, (ELIF, comparison, Block)*, (ELSE, Block)?
+        if_token, condition, body, *rest = items
+        elifs = []
+        orelse = None
+        i = 0
+        while i < len(rest):
+            token = rest[i]
+            if token.type == "ELIF":
+                elifs.append(Elif(rest[i + 1], rest[i + 2], _loc(token)))
+                i += 3
+            else:  # ELSE
+                orelse = rest[i + 1]
+                i += 2
+        return If(condition, body, tuple(elifs), orelse, _loc(if_token))
 
     def while_stmt(self, items):
-        condition = items[1]
-        body = tuple(x for x in items[3:] if isinstance(x, (Print, Input, Let, If, While, Label, Goto)))
-        return While(condition, body, _loc(items[0]))
+        # WHILE, comparison, Block
+        return While(items[1], items[2], _loc(items[0]))
 
     def label_stmt(self, items):
         return Label(str(items[1]), _loc(items[0]))

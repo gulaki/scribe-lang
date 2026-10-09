@@ -1,0 +1,12 @@
+# if / elif / else: exactly one branch runs.
+print "Enter a score from 0 to 100:"
+input score
+if score >= 90 {
+    print "grade A"
+} elif score >= 80 {
+    print "grade B"
+} elif score >= 70 {
+    print "grade C"
+} else {
+    print "grade F"
+}

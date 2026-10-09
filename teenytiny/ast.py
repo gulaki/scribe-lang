@@ -46,17 +46,39 @@ class Let(Stmt):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
+# eq=False: a Block is compared and hashed by identity, never by value. Two
+# textually identical blocks are still two different scopes, and the semantic
+# model uses Block objects as dictionary keys.
+@dataclass(frozen=True, eq=False)
+class Block(Stmt):
+    """A `{ ... }` list of statements. Every Block is its own variable scope."""
+
+    statements: tuple[Stmt, ...]
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class Elif(Node):
+    """One `elif <condition> { ... }` arm of an If. Not a statement itself."""
+
+    condition: Comparison
+    body: Block
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
 @dataclass(frozen=True)
 class If(Stmt):
     condition: Comparison
-    body: tuple[Stmt, ...]
+    body: Block
+    elifs: tuple[Elif, ...] = ()
+    orelse: Block | None = None
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
 @dataclass(frozen=True)
 class While(Stmt):
     condition: Comparison
-    body: tuple[Stmt, ...]
+    body: Block
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
@@ -117,4 +139,4 @@ class Comparison(Expr):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
-StmtType = Union[Print, Input, Let, If, While, Label, Goto]
+StmtType = Union[Print, Input, Let, If, While, Block, Label, Goto]

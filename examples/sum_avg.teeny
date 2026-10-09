@@ -1,0 +1,18 @@
+print "How many numbers?"
+input N
+
+i = 0
+num = 0
+sum = 0
+while i < N {
+    print "\nEnter number:"
+    input num
+    sum = sum + num
+    i = i + 1
+}
+print "Sum ="
+print sum
+
+avg = sum / N
+print "Average ="
+print avg

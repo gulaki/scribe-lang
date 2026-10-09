@@ -1,0 +1,184 @@
+"""Compile to C, build with a real C compiler, run, and compare stdout.
+
+These tests skip themselves when no C compiler is available.
+"""
+import pytest
+
+from conftest import EXAMPLES
+
+
+@pytest.mark.parametrize("stdin, expected", [
+    ("5\n", "positive\n"),
+    ("-3\n", "negative\n"),
+    ("0\n", "zero\n"),
+])
+def test_if_elif_else_runs_exactly_one_branch(run_teeny, stdin, expected):
+    program = '''\
+input x
+if x > 0 {
+    print "positive"
+} elif x < 0 {
+    print "negative"
+} else {
+    print "zero"
+}
+'''
+    assert run_teeny(program, stdin) == expected
+
+
+def test_if_without_else_can_skip_everything(run_teeny):
+    assert run_teeny('if 1 > 2 {\n    print "no"\n}\nprint "done"\n') == "done\n"
+
+
+def test_elif_condition_is_only_evaluated_when_needed(run_teeny):
+    program = 'x = 1\nif x == 1 {\n    print "a"\n} elif x == 1 {\n    print "b"\n}\n'
+    assert run_teeny(program) == "a\n"
+
+
+def test_while_body_variable_is_fresh_on_every_iteration(run_teeny):
+    program = '''\
+i = 0
+while i < 3 {
+    count = 0
+    count = count + 1
+    print count
+    i = i + 1
+}
+'''
+    assert run_teeny(program) == "1.00\n1.00\n1.00\n"
+
+
+def test_inner_block_updates_outer_variable(run_teeny):
+    program = '''\
+total = 0
+i = 1
+while i <= 4 {
+    if i > 2 {
+        total = total + i
+    }
+    i = i + 1
+}
+print total
+'''
+    assert run_teeny(program) == "7.00\n"
+
+
+def test_sibling_blocks_and_a_later_program_level_variable_are_independent(run_teeny):
+    program = '''\
+x = 1
+if x > 0 {
+    t = 10
+    print t
+} else {
+    t = 20
+    print t
+}
+t = 5
+print t
+'''
+    assert run_teeny(program) == "10.00\n5.00\n"
+
+
+def test_block_variable_that_shares_a_name_with_a_later_global_does_not_leak(run_teeny):
+    program = '''\
+if 1 > 0 {
+    v = 7
+    print v
+}
+v = 1
+print v
+'''
+    assert run_teeny(program) == "7.00\n1.00\n"
+
+
+def test_standalone_block_scope(run_teeny):
+    program = 'x = 1\n{\n    x = x + 1\n    y = 10\n    print y\n}\nprint x\n'
+    assert run_teeny(program) == "10.00\n2.00\n"
+
+
+def test_goto_out_of_a_nested_block(run_teeny):
+    program = '''\
+i = 1
+input n
+label loop
+print i
+i = i + 1
+if i <= n {
+    goto loop
+}
+'''
+    assert run_teeny(program, "3\n") == "1.00\n2.00\n3.00\n"
+
+
+def test_label_at_the_end_of_a_block_is_valid_strict_c(run_teeny):
+    program = '''\
+x = 1
+if x > 0 {
+    goto done
+    print "skipped"
+    label done
+}
+print "after"
+'''
+    assert run_teeny(program) == "after\n"
+
+
+def test_goto_inside_a_block_never_skips_a_declaration(run_teeny):
+    # `a` is declared at the top of the block, so jumping over its first
+    # assignment leaves it at 0 rather than uninitialised.
+    program = '{\n    goto skip\n    a = 7\n    label skip\n    print a\n}\n'
+    assert run_teeny(program) == "0.00\n"
+
+
+def test_input_into_a_block_variable(run_teeny):
+    program = '{\n    input n\n    print n * 2\n}\n'
+    assert run_teeny(program, "21\n") == "42.00\n"
+
+
+def test_deeply_nested_blocks(run_teeny):
+    program = '''\
+a = 1
+{
+    b = a + 1
+    {
+        c = b + 1
+        {
+            d = c + 1
+            print d
+        }
+    }
+}
+'''
+    assert run_teeny(program) == "4.00\n"
+
+
+EXAMPLE_RUNS = {
+    "factorial": ("5\n", "Enter number to calculate factorial:\n\nFactorial = \n120.00\n"),
+    "fibonacci": ("6\n", "How many fibonacci numbers do you want?\n\n0.00\n1.00\n1.00\n2.00\n3.00\n5.00\n"),
+    "loop_goto": ("3\n", "Enter number: \n1.00\n2.00\n3.00\n"),
+    "classify": ("85\n", "Enter a score from 0 to 100:\ngrade B\n"),
+    "gcd": ("48\n18\n", "Enter two positive whole numbers:\ngcd =\n6.00\n"),
+    "scopes": ("", "10.00\n2.00\n0.00\n1.00\n4.00\n"),
+    "nested_loops": ("", "6.00\n12.00\n18.00\n"),
+}
+
+
+@pytest.mark.parametrize("name", EXAMPLE_RUNS)
+def test_example_program_output(run_teeny, name):
+    stdin, expected = EXAMPLE_RUNS[name]
+    source = (EXAMPLES / f"{name}.teeny").read_text(encoding="utf-8")
+    assert run_teeny(source, stdin) == expected
+
+
+@pytest.mark.parametrize("stdin, expected", [
+    ("95\n", "grade A"), ("90\n", "grade A"), ("89\n", "grade B"),
+    ("70\n", "grade C"), ("69\n", "grade F"), ("0\n", "grade F"),
+])
+def test_classify_example_boundaries(run_teeny, stdin, expected):
+    source = (EXAMPLES / "classify.teeny").read_text(encoding="utf-8")
+    assert run_teeny(source, stdin).splitlines()[-1] == expected
+
+
+def every_example_has_a_recorded_run():
+    on_disk = {path.stem for path in EXAMPLES.glob("*.teeny")}
+    assert on_disk == set(EXAMPLE_RUNS), "add new examples to EXAMPLE_RUNS"

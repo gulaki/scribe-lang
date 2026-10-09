@@ -1,0 +1,13 @@
+# Row sums of a 3x3 multiplication table. `total` and `col` are declared in
+# the outer loop body, so each row starts them fresh.
+row = 1
+while row <= 3 {
+    total = 0
+    col = 1
+    while col <= 3 {
+        total = total + row * col
+        col = col + 1
+    }
+    print total
+    row = row + 1
+}

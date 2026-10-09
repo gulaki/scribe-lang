@@ -1,0 +1,17 @@
+# Block scope. A variable is declared by its first assignment, in the
+# innermost block, and disappears when that block ends.
+x = 1                  # program-level variable
+{
+    x = x + 1          # x is already visible, so this assigns the outer x
+    y = 10             # first assigned here: y belongs to this block
+    print y
+}
+print x                # 2
+# print y              # would be an error: y ended with its block
+
+i = 0
+while i < 3 {
+    square = i * i     # a fresh variable on every pass through the body
+    print square
+    i = i + 1
+}

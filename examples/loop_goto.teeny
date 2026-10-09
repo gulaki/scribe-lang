@@ -4,6 +4,6 @@ input N
 label loop
     print i
     i = i + 1
-if i <= N then
-    goto loop
-endif
+if i <= N {
+    goto loop      # jumping out of a block to an enclosing label is allowed
+}

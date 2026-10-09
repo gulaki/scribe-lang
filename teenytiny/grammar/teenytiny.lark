@@ -1,27 +1,41 @@
 // Teeny Tiny grammar.
 // Keep syntax here, not in Python. This is the primary language-definition file.
+//
+// Statements are separated (not terminated) by newlines or ';'. That is what
+// lets a block fit on one line:   if x > 0 { print x; x = x - 1 }
 
 start: program
 
-program: (_NL | statement)*
+program: _sep? _stmt_list?
+
+// One or more statements with separators between them. Leading and trailing
+// separators are allowed so blank lines and comment-only lines are harmless.
+_stmt_list: statement (_sep statement)* _sep?
+_sep: (_NL | ";")+
 
 ?statement: print_stmt
           | input_stmt
           | let_stmt
           | if_stmt
           | while_stmt
+          | block
           | label_stmt
           | goto_stmt
 
-print_stmt: PRINT (STRING | expression) _NL
-input_stmt: INPUT IDENT _NL
-let_stmt: IDENT "=" expression _NL
+print_stmt: PRINT (STRING | expression)
+input_stmt: INPUT IDENT
+let_stmt: IDENT "=" expression
 
-if_stmt: IF comparison THEN _NL statement* ENDIF _NL
-while_stmt: WHILE comparison REPEAT _NL statement* ENDWHILE _NL
+// `}` and the next `elif` / `else` must be on the same line (K&R style).
+if_stmt: IF comparison block (ELIF comparison block)* (ELSE block)?
+while_stmt: WHILE comparison block
 
-label_stmt: LABEL IDENT _NL
-goto_stmt: GOTO IDENT _NL
+// A block is a scope. LBRACE/RBRACE are named so their positions survive into
+// the parse tree and can be attached to AST nodes.
+block: LBRACE _sep? _stmt_list? RBRACE
+
+label_stmt: LABEL IDENT
+goto_stmt: GOTO IDENT
 
 comparison: expression COMP_OP expression
 
@@ -37,16 +51,20 @@ MUL_OP: "*" | "/"
 SIGN: "+" | "-"
 COMP_OP: "==" | "!=" | ">=" | "<=" | ">" | "<"
 
+LBRACE: "{"
+RBRACE: "}"
+
 // Keyword terminals intentionally remain explicit. Lark's contextual lexer
 // prevents keywords from stealing an IDENT where an identifier is expected.
+// Because of that, a keyword that is not valid at the current position (for
+// example `else` at the start of a statement) lexes as an IDENT; the semantic
+// analyzer rejects such names (see RESERVED_WORDS in semantics.py).
 PRINT: "print"
 INPUT: "input"
 IF: "if"
-THEN: "then"
-ENDIF: "endif"
+ELIF: "elif"
+ELSE: "else"
 WHILE: "while"
-REPEAT: "repeat"
-ENDWHILE: "endwhile"
 LABEL: "label"
 GOTO: "goto"
 
@@ -58,4 +76,3 @@ COMMENT: /#[^\n\r]*/
 _NL: /\r?\n/
 %ignore /[ \t\r]+/
 %ignore COMMENT
-

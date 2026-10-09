@@ -11,13 +11,13 @@ print "How many fibonacci numbers do you want?"
 input nums
 a = 0
 b = 1
-while nums > 0 repeat
+while nums > 0 {
     print a
     c = a + b
     a = b
     b = c
     nums = nums - 1
-endwhile
+}
 '''
     result = COMPILER.compile(source)
     assert "#include <stdio.h>" in result.c_source
@@ -28,12 +28,12 @@ endwhile
 def test_nested_if_and_while():
     source = '''\
 x = 5
-if x >= 5 then
+if x >= 5 {
     print "yes"
-    while x > 0 repeat
+    while x > 0 {
         x = x - 1
-    endwhile
-endif
+    }
+}
 '''
     result = COMPILER.compile(source)
     assert "if ((x >= 5))" in result.c_source
@@ -84,3 +84,10 @@ def test_bad_syntax_is_rejected():
         pass
     else:
         raise AssertionError("expected ParseError")
+
+
+def test_identifiers_that_start_with_a_keyword_are_plain_identifiers():
+    source = "iffy = 1\nelsewhere = 2\nwhilex = 3\nprinter = 4\nprint iffy + elsewhere + whilex + printer\n"
+    result = COMPILER.compile(source)
+    for name in ("iffy", "elsewhere", "whilex", "printer"):
+        assert f"float {name};" in result.c_source
