@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-import teenytiny
-from teenytiny.ast import Block, Let, Number, Program
-from teenytiny.errors import SemanticError
-from teenytiny.semantics import RESERVED_WORDS, SemanticAnalyzer
+import scribe_lang
+from scribe_lang.ast import Block, Let, Number, Program
+from scribe_lang.errors import SemanticError
+from scribe_lang.semantics import RESERVED_WORDS, SemanticAnalyzer
 
 
 def names(scope):
@@ -187,6 +187,6 @@ def test_keyword_as_a_label_name_is_rejected(compiler, word):
 
 
 def test_reserved_words_match_the_keywords_in_the_grammar():
-    grammar = Path(teenytiny.__file__).parent / "grammar" / "teenytiny.lark"
+    grammar = Path(scribe_lang.__file__).parent / "grammar" / "scribe_lang.lark"
     keywords = set(re.findall(r'^[A-Z_]+:\s*"([a-z]+)"\s*$', grammar.read_text(), re.MULTILINE))
     assert keywords == set(RESERVED_WORDS)

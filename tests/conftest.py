@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from teenytiny.compiler import Compiler
+from scribe_lang.compiler import Compiler
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 C_COMPILER = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
@@ -19,7 +19,7 @@ def compiler() -> Compiler:
 
 
 @pytest.fixture
-def run_teeny(compiler, tmp_path):
+def run_scribe(compiler, tmp_path):
     """Compile Teeny Tiny source all the way to a native binary and run it.
 
     Returns the program's stdout. The generated C is built with strict flags so

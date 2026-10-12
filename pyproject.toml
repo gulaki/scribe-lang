@@ -3,20 +3,20 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "teenytiny-lark"
+name = "scribe-lang"
 version = "0.1.0"
-description = "Extensible Teeny Tiny compiler implemented with Python and Lark"
+description = "Scribe language compiler implemented with Python and Lark"
 requires-python = ">=3.10"
 dependencies = ["lark>=1.1,<2"]
 
 [project.scripts]
-ttc = "teenytiny.cli:main"
+scribe = "scribe_lang.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
-include = ["teenytiny*"]
+include = ["scribe_lang*"]
 
 [tool.setuptools.package-data]
-teenytiny = ["grammar/*.lark"]
+scribe_lang = ["grammar/*.lark"]

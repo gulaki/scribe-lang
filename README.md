@@ -1,6 +1,6 @@
-# Teeny Tiny Compiler — Python + Lark
+# Scribe Lang — Python + Lark
 
-A modern rewrite of Austin Z. Henley's three-part Teeny Tiny compiler tutorial.
+Inspired from Austin Z. Henley's three-part Teeny Tiny compiler tutorial.
 
 The original compiler is deliberately educational: it has a hand-written lexer, a hand-written recursive-descent parser, and an emitter that produces C. This version keeps the language and C target, but changes the architecture so that language evolution does not require rewriting the compiler front-end.
 
@@ -43,7 +43,7 @@ The original compiler is deliberately educational: it has a hand-written lexer, 
 
 ### 1. Grammar is data
 
-`teenytiny/grammar/teenytiny.lark` is the language syntax. You can change the grammar without editing a hand-written lexer or parser.
+`scribe_lang/grammar/scribe_lang.lark` is the language syntax. You can change the grammar without editing a hand-written lexer or parser.
 
 ### 2. AST is the compiler contract
 
@@ -73,13 +73,13 @@ pip install -e .
 ## Compile
 
 ```bash
-python -m teenytiny.cli examples/fibonacci.teeny -o build/fibonacci.c
+python -m scribe_lang.cli examples/fibonacci.teeny -o build/fibonacci.c
 ```
 
 Generate Make:
 
 ```bash
-python -m teenytiny.cli examples/fibonacci.teeny \
+python -m scribe_lang.cli examples/fibonacci.teeny \
   -o build/fibonacci.c \
   --build make \
   --build-output build/Makefile
@@ -88,7 +88,7 @@ python -m teenytiny.cli examples/fibonacci.teeny \
 Generate Ninja:
 
 ```bash
-python -m teenytiny.cli examples/fibonacci.teeny \
+python -m scribe_lang.cli examples/fibonacci.teeny \
   -o build/fibonacci.c \
   --build ninja \
   --build-output build/build.ninja
@@ -147,8 +147,8 @@ python -m pytest
 
 ### Add a new syntax construct
 
-1. Add its syntax to `grammar/teenytiny.lark`.
-2. Add an AST node to `teenytiny/ast.py`.
+1. Add its syntax to `grammar/scribe_lang.lark`.
+2. Add an AST node to `scribe_lang/ast.py`.
 3. Add a Transformer method in `parser.py`.
 4. Add semantic checks in `semantics.py`.
 5. Add code generation in the backend(s).

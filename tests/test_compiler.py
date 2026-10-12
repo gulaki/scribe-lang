@@ -1,5 +1,5 @@
-from teenytiny.compiler import Compiler
-from teenytiny.errors import ParseError, SemanticError
+from scribe_lang.compiler import Compiler
+from scribe_lang.errors import ParseError, SemanticError
 
 
 COMPILER = Compiler()

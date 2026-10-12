@@ -1,4 +1,4 @@
-// Teeny Tiny grammar.
+// Scribe lang grammar.
 // Keep syntax here, not in Python. This is the primary language-definition file.
 //
 // Statements are separated (not terminated) by newlines or ';'. That is what
