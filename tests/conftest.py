@@ -19,7 +19,7 @@ def compiler() -> Compiler:
 
 
 @pytest.fixture
-def run_teeny(compiler, tmp_path):
+def run_scribe(compiler, tmp_path):
     """Compile Teeny Tiny source all the way to a native binary and run it.
 
     Returns the program's stdout. The generated C is built with strict flags so

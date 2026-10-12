@@ -187,6 +187,6 @@ def test_keyword_as_a_label_name_is_rejected(compiler, word):
 
 
 def test_reserved_words_match_the_keywords_in_the_grammar():
-    grammar = Path(teenytiny.__file__).parent / "grammar" / "teenytiny.lark"
+    grammar = Path(scribe_lang.__file__).parent / "grammar" / "scribe_lang.lark"
     keywords = set(re.findall(r'^[A-Z_]+:\s*"([a-z]+)"\s*$', grammar.read_text(), re.MULTILINE))
     assert keywords == set(RESERVED_WORDS)

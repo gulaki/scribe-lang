@@ -157,8 +157,8 @@ def test_invalid_syntax_is_rejected(source):
 
 def test_parse_error_reports_filename_line_and_column():
     with pytest.raises(ParseError) as info:
-        PARSER.parse("if 1 > 0 then\n", "prog.teeny")
-    assert str(info.value).endswith("prog.teeny:1:10")
+        PARSER.parse("if 1 > 0 then\n", "prog.scribe")
+    assert str(info.value).endswith("prog.scribe:1:10")
 
 
 def test_removed_keywords_are_ordinary_identifiers():
