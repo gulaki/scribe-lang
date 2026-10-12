@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-import teenytiny
-from teenytiny.ast import Block, Let, Number, Program
-from teenytiny.errors import SemanticError
-from teenytiny.semantics import RESERVED_WORDS, SemanticAnalyzer
+import scribe_lang
+from scribe_lang.ast import Block, Let, Number, Program
+from scribe_lang.errors import SemanticError
+from scribe_lang.semantics import RESERVED_WORDS, SemanticAnalyzer
 
 
 def names(scope):

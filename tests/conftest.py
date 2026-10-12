@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from teenytiny.compiler import Compiler
+from scribe_lang.compiler import Compiler
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 C_COMPILER = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")

@@ -12,8 +12,7 @@ from .ast import (
 from .errors import ParseError
 
 
-_GRAMMAR_PATH = Path(__file__).resolve().parent / "grammar" / "teenytiny.lark"
-
+_GRAMMAR_PATH = Path(__file__).resolve().parent / "grammar" / "scribe_lang.lark"
 
 def _loc(item) -> SourceLocation:
     return SourceLocation(

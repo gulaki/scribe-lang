@@ -1,8 +1,8 @@
 import pytest
 
-from teenytiny.ast import Block, Elif, If, Let, Print, While
-from teenytiny.errors import ParseError
-from teenytiny.parser import Parser
+from scribe_lang.ast import Block, Elif, If, Let, Print, While
+from scribe_lang.errors import ParseError
+from scribe_lang.parser import Parser
 
 PARSER = Parser()
 

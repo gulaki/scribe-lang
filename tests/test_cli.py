@@ -1,5 +1,5 @@
 from conftest import EXAMPLES
-from teenytiny.cli import main
+from scribe_lang.cli import main
 
 
 def test_cli_compiles_an_example(tmp_path):
