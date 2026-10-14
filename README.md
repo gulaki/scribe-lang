@@ -73,13 +73,13 @@ pip install -e .
 ## Compile
 
 ```bash
-python -m scribe_lang.cli examples/fibonacci.teeny -o build/fibonacci.c
+python -m scribe_lang.cli examples/fibonacci.scribe -o build/fibonacci.c
 ```
 
 Generate Make:
 
 ```bash
-python -m scribe_lang.cli examples/fibonacci.teeny \
+python -m scribe_lang.cli examples/fibonacci.scribe \
   -o build/fibonacci.c \
   --build make \
   --build-output build/Makefile
@@ -88,7 +88,7 @@ python -m scribe_lang.cli examples/fibonacci.teeny \
 Generate Ninja:
 
 ```bash
-python -m scribe_lang.cli examples/fibonacci.teeny \
+python -m scribe_lang.cli examples/fibonacci.scribe \
   -o build/fibonacci.c \
   --build ninja \
   --build-output build/build.ninja

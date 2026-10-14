@@ -10,7 +10,7 @@ from .errors import CompilerError
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Teeny Tiny compiler powered by Lark")
+    p = argparse.ArgumentParser(description="Scribe-lang compiler powered by Lark")
     p.add_argument("source", type=Path)
     p.add_argument("-o", "--output", type=Path, default=Path("out.c"), help="generated C source")
     p.add_argument("--ast", action="store_true", help="print the AST")
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
     except (OSError, CompilerError, KeyError) as exc:
-        print(f"ttc: {exc}", file=sys.stderr)
+        print(f"scribe: {exc}", file=sys.stderr)
         return 1
 
 
