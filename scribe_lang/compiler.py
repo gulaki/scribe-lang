@@ -44,5 +44,5 @@ class Compiler:
         config: BuildConfig | None = None,
     ) -> None:
         backend = BUILD_SYSTEMS[build_system]
-        text = backend.generate(Path(c_source), Path(executable), config or BuildConfig())
+        text = backend.generate(Path(c_source), Path(executable), Path(output), config or BuildConfig())
         Path(output).write_text(text, encoding="utf-8")

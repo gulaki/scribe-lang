@@ -21,8 +21,8 @@ while nums > 0 {
 '''
     result = COMPILER.compile(source)
     assert "#include <stdio.h>" in result.c_source
-    assert "while ((nums > 0))" in result.c_source
-    assert "c = (a + b);" in result.c_source
+    assert "while ((v_nums > 0.0f))" in result.c_source
+    assert "v_c = (v_a + v_b);" in result.c_source
 
 
 def test_nested_if_and_while():
@@ -36,13 +36,13 @@ if x >= 5 {
 }
 '''
     result = COMPILER.compile(source)
-    assert "if ((x >= 5))" in result.c_source
-    assert "while ((x > 0))" in result.c_source
+    assert "if ((v_x >= 5.0f))" in result.c_source
+    assert "while ((v_x > 0.0f))" in result.c_source
 
 
 def test_parentheses_are_supported():
     result = COMPILER.compile("x = (2 + 3) * 4\nprint x\n")
-    assert "((2 + 3) * 4)" in result.c_source
+    assert "((2.0f + 3.0f) * 4.0f)" in result.c_source
 
 
 def test_undeclared_read_is_rejected():
@@ -74,7 +74,7 @@ def test_duplicate_label_is_rejected():
 
 def test_comments_and_blank_lines():
     result = COMPILER.compile("# comment\n\nx = 2 # inline\nprint x\n")
-    assert "float x;" in result.c_source
+    assert "float v_x;" in result.c_source
 
 
 def test_bad_syntax_is_rejected():
@@ -90,4 +90,4 @@ def test_identifiers_that_start_with_a_keyword_are_plain_identifiers():
     source = "iffy = 1\nelsewhere = 2\nwhilex = 3\nprinter = 4\nprint iffy + elsewhere + whilex + printer\n"
     result = COMPILER.compile(source)
     for name in ("iffy", "elsewhere", "whilex", "printer"):
-        assert f"float {name};" in result.c_source
+        assert f"float v_{name};" in result.c_source
