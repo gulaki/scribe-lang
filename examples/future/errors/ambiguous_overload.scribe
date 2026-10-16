@@ -1,0 +1,6 @@
+# PROPOSAL: ambiguity is an error, never a silent pick.
+#   error: call to `f(int, int)` is ambiguous:
+#   candidates f(float, int) and f(int, float) both need one widening
+fn f(a: float, b: int) -> int { return 1 }
+fn f(a: int, b: float) -> int { return 2 }
+print f(1, 2)

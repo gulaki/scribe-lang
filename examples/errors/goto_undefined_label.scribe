@@ -1,0 +1,2 @@
+# expect: undeclared label
+goto nowhere

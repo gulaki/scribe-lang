@@ -4,6 +4,7 @@ test:
 	python -m pytest
 
 demo:
+	mkdir -p build
 	python -m scribe_lang.cli examples/fibonacci.scribe -o build/fibonacci.c --build make --build-output build/Makefile
 
 clean:

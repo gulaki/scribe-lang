@@ -1,0 +1,28 @@
+# PROPOSAL (v0.3): explicitly typed functions, recursion, early return.
+# Not supported yet. See docs/design/type-system.md and lowering.md.
+
+fn gcd(a: int, b: int) -> int {
+    while b != 0 {
+        a, b = b, a % b       # `%` exists once `int` does; division by 0 traps
+    }
+    return a
+}
+
+fn is_prime(n: int) -> bool {
+    if n < 2 { return false }
+    d: int = 2
+    while d * d <= n {
+        if n % d == 0 { return false }
+        d = d + 1
+    }
+    return true
+}
+
+fn fact(n: int) -> int {      # checked arithmetic traps on overflow at n = 21
+    if n <= 1 { return 1 }
+    return n * fact(n - 1)
+}
+
+print gcd(48, 18)             # 6
+print is_prime(97)            # true
+print fact(10)                # 3628800

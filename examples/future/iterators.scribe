@@ -1,0 +1,24 @@
+# PROPOSAL (v0.8): iterators and generics. An iterator is a small state
+# struct plus a `next` function; `for` lowers to a plain C loop over it.
+# Nothing is allocated unless the iterator itself escapes.
+
+iterator evens(limit: int) -> int {
+    i: int = 0
+    while i < limit {
+        yield i                  # lowered to a state machine, no coroutines
+        i = i + 2
+    }
+}
+
+for n in evens(10) {
+    print n                      # 0 2 4 6 8
+}
+
+fn sum_all[T: Numeric](items: Iterable[T]) -> T {
+    total: T = T.zero
+    for item in items { total = total + item }
+    return total
+}
+
+print sum_all(evens(10))         # sum_all__int is generated once
+print sum_all([1.5, 2.5])        # sum_all__float is generated once

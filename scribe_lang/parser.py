@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from lark import Lark, Transformer, Token
@@ -100,7 +101,9 @@ class ASTBuilder(Transformer):
         return Variable(str(items[0]), _loc(items[0]))
 
     def grouped(self, items):
-        return Grouped(items[0], _loc(items[0]))
+        # The parentheses are anonymous tokens and are filtered out, so take
+        # the location of the expression inside them.
+        return Grouped(items[0], items[0].location)
 
     def ADD_OP(self, token):
         return token
@@ -123,10 +126,14 @@ def _fold_binary(items):
     return node
 
 
+_ESCAPES = {'"': '"', "\\": "\\", "n": "\n", "r": "\r", "t": "\t"}
+_ESCAPE_RE = re.compile(r"\\(.)")
+
+
 def _decode_string(token_text: str) -> str:
-    raw = token_text[1:-1]
-    # Language deliberately keeps escaping small and C-friendly.
-    return bytes(raw, "utf-8").decode("unicode_escape")
+    # The STRING terminal only admits the escapes in _ESCAPES. Decode them by
+    # hand: `unicode_escape` would also re-read non-ASCII text as Latin-1.
+    return _ESCAPE_RE.sub(lambda m: _ESCAPES[m.group(1)], token_text[1:-1])
 
 
 class Parser:
@@ -148,16 +155,18 @@ class Parser:
             tree = self._parser.parse(source)
             return ASTBuilder().transform(tree)
         except UnexpectedInput as exc:
-            line = getattr(exc, "line", None)
-            column = getattr(exc, "column", None)
+            where = f"{exc.line}:{exc.column}"
+            if filename:
+                where = f"{filename}:{where}"
             message = self._format_lark_error(exc)
-            suffix = f" at {filename}" if filename else ""
-            raise ParseError(f"{message}{suffix}:{line}:{column}") from exc
+            raise ParseError(f"{message} at {where}") from exc
 
     @staticmethod
     def _format_lark_error(exc: UnexpectedInput) -> str:
         if isinstance(exc, UnexpectedToken):
             expected = ", ".join(sorted(exc.expected))
+            if exc.token.type == "$END":
+                return f"unexpected end of input; expected one of: {expected}"
             return f"unexpected token {exc.token!r}; expected one of: {expected}"
         if isinstance(exc, UnexpectedCharacters):
             return f"unexpected character {exc.char!r}"

@@ -135,7 +135,9 @@ goto top
 - Labels share one program-wide namespace. `goto` may jump within its own block or out to an enclosing block, never into a nested block.
 - `print`, `input`, `if`, `elif`, `else`, `while`, `label` and `goto` are reserved words.
 
-**What the C looks like.** Program-level variables become zero-initialised globals. A variable first assigned inside a block is declared as `float x = 0;` at the top of the matching C block, so every variable starts at 0 and a `goto` inside a block can never jump over a declaration.
+**What the C looks like.** Program-level variables become zero-initialised globals. A variable first assigned inside a block is declared as `float v_x = 0;` at the top of the matching C block, so every variable starts at 0 and a `goto` inside a block can never jump over a declaration. Scribe variable `x` becomes C `v_x` and label `top` becomes `l_top`, so any Scribe name is safe even when it is a C keyword or a `<stdio.h>` name (`int`, `printf`, `EOF`). Number literals are emitted as C `float` literals (`7` → `7.0f`), so `7 / 2` is `3.5`. String `print` uses `puts` with an escaped, ASCII-only literal, so `%` and non-ASCII text print as written.
+
+**Build files** are written next to the C file by default, with paths relative to the build file's own directory. Run them from there: `make -C build` or `ninja -C build`.
 
 ## Test
 

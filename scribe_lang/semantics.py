@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import math
+import struct
 from dataclasses import dataclass, field
 
 from .ast import (
     Binary, Block, Comparison, Expr, Goto, Grouped, If, Input, Label, Let,
-    Print, Program, SourceLocation, Stmt, Unary, Variable, While,
+    Number, Print, Program, SourceLocation, Stmt, Unary, Variable, While,
 )
 from .errors import SemanticError
 
@@ -185,7 +187,15 @@ class SemanticAnalyzer:
     # -- expressions -------------------------------------------------------
 
     def _expr(self, expr: Expr, scope: Scope) -> None:
-        if isinstance(expr, Variable):
+        if isinstance(expr, Number):
+            # Round-trip through a C float: a literal that rounds to infinity
+            # is an error here, not a C compiler warning later.
+            (as_float,) = struct.unpack("f", struct.pack("f", float(expr.value)))
+            if math.isinf(as_float):
+                raise SemanticError(
+                    f"number {expr.value} is too large for a float{_where(expr.location)}"
+                )
+        elif isinstance(expr, Variable):
             if scope.lookup(expr.name) is None:
                 message = f"use of undeclared variable '{expr.name}'{_where(expr.location)}"
                 gone = self._closed.get(expr.name)

@@ -1,0 +1,4 @@
+# expect: duplicate label
+label top
+print 1
+label top

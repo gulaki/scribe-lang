@@ -1,0 +1,26 @@
+# Square root by Newton's method, stopping early once the guess settles.
+# Showcases: float arithmetic, if/else, an early exit with `goto`, and block
+# scoped temporaries (`next` and `diff` are fresh on every pass).
+print "Square root of (a number >= 0):"
+input x
+
+if x < 0 {
+    print "no real square root"
+} else {
+    guess = x + 1              # never 0 when x >= 0, so x / guess is safe
+    pass = 0
+    while pass < 50 {
+        next = (guess + x / guess) / 2
+        diff = next - guess
+        if diff < 0 {
+            diff = 0 - diff    # absolute value
+        }
+        guess = next
+        if diff < 0.000001 {
+            goto done
+        }
+        pass = pass + 1
+    }
+    label done
+    print guess
+}

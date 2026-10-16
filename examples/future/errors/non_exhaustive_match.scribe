@@ -1,0 +1,7 @@
+# PROPOSAL: unions must be matched completely.
+#   error: match on `int | float` does not cover `float`
+fn f(n: int | float) -> int {
+    match n {
+        int i => return i
+    }
+}
