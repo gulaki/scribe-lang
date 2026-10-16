@@ -21,7 +21,7 @@ while nums > 0 {
 '''
     result = COMPILER.compile(source)
     assert "#include <stdio.h>" in result.c_source
-    assert "while ((v_nums > 0.0f))" in result.c_source
+    assert "while (v_nums > 0.0f)" in result.c_source
     assert "v_c = (v_a + v_b);" in result.c_source
 
 
@@ -36,8 +36,8 @@ if x >= 5 {
 }
 '''
     result = COMPILER.compile(source)
-    assert "if ((v_x >= 5.0f))" in result.c_source
-    assert "while ((v_x > 0.0f))" in result.c_source
+    assert "if (v_x >= 5.0f)" in result.c_source
+    assert "while (v_x > 0.0f)" in result.c_source
 
 
 def test_parentheses_are_supported():

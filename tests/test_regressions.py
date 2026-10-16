@@ -208,3 +208,58 @@ def test_parse_error_at_end_of_input_names_it():
         Parser().parse("if 1 > 0 {")
     assert "unexpected end of input" in str(info.value)
     assert "$END" not in str(info.value)
+
+
+# -- Bug 9: `input` used scanf("%f"), which is undefined for out-of-range text --
+
+READ_AND_PRINT = "input a\ninput b\nprint a\nprint b\n"
+
+
+@pytest.mark.parametrize("stdin, expected", [
+    ("1.5\n2\n", "1.50\n2.00\n"),
+    ("  7   \n\n 8\n", "7.00\n8.00\n"),               # any whitespace separates tokens
+    ("1e999\n3\n", "0.00\n3.00\n"),                     # out of range: was undefined
+    ("-1e999\n3\n", "0.00\n3.00\n"),
+    ("nan\n3\n", "0.00\n3.00\n"),                       # non-finite is not a Scribe number
+    ("inf\n3\n", "0.00\n3.00\n"),
+    ("abc\n4\n", "0.00\n4.00\n"),                       # bad token consumed, next one read
+    ("12abc\n4\n", "0.00\n4.00\n"),                     # trailing junk rejects the whole token
+    ("9" * 200 + "\n5\n", "0.00\n5.00\n"),              # over-long token consumed entirely
+    ("", "0.00\n0.00\n"),                               # end of input
+    ("6", "6.00\n0.00\n"),                              # no trailing newline
+])
+def test_input_never_misreads_or_overflows(run_scribe, stdin, expected):
+    assert run_scribe(READ_AND_PRINT, stdin) == expected
+
+
+def test_input_helper_only_emitted_when_used(compiler):
+    assert "scribe_read_float" not in c_source(compiler, "print 1\n")
+    assert "scanf" not in c_source(compiler, "input x\n")
+
+
+# -- Bug 10: comparisons were wrapped in a second pair of parentheses --------
+# `if ((a == b))` makes clang warn (-Wparentheses-equality).
+
+def test_conditions_have_a_single_pair_of_parentheses(compiler):
+    source = c_source(compiler, "x = 1\nif x == 1 {\n    print x\n}\nwhile x < 3 {\n    x = x + 1\n}\n")
+    assert "if (v_x == 1.0f) {" in source
+    assert "while (v_x < 3.0f) {" in source
+    assert "((" not in source.replace("(float)((", "")
+
+
+def test_generated_c_builds_without_any_warning(compiler, tmp_path):
+    import subprocess
+
+    from conftest import C_COMPILER, EXAMPLES
+
+    if C_COMPILER is None:
+        pytest.skip("no C compiler")
+    for example in sorted(EXAMPLES.glob("*.scribe")):
+        c_file = tmp_path / f"{example.stem}.c"
+        c_file.write_text(compiler.compile(example.read_text(encoding="utf-8")).c_source, encoding="utf-8")
+        build = subprocess.run(
+            [C_COMPILER, "-std=c11", "-pedantic-errors", "-Wall", "-Wextra", "-Werror",
+             "-o", str(tmp_path / example.stem), str(c_file)],
+            capture_output=True, text=True,
+        )
+        assert build.returncode == 0, f"{example.name}: {build.stderr}"

@@ -27,13 +27,12 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 21 | Data races | absent: no threads in v1 | n/a |
 | 22 | Calling a function through a wrong-typed pointer / missing prototype | emit: no function pointers in v1; every function has a prototype | n/a |
 | 23 | Infinite loops without side effects (C11 forward-progress) | emit: loops only compile as-is under C11 where the controlling expression is non-constant; trivially infinite loops get a volatile touch (proposed) | open |
-| 24 | `scanf` conversion overflow (`%f` out of range is UB) | check: parse with `strtof` and range-check instead of `scanf("%f")` | **gap: v0.1 still uses scanf** |
+| 24 | `scanf` conversion overflow (`%f` out of range is UB) | check: parse with `strtof` and range-check instead of `scanf("%f")` | done: `strtof` helper, non-finite or out-of-range reads as 0 |
 | 25 | Floating-point environment / signalling NaN | emit: default environment; NaN compares as in IEEE (defined) | accepted |
 
 ## Known gaps in v0.1
 
-- Row 24: `input` calls `scanf("%f", ...)`. The C standard makes the result of an out-of-range conversion undefined. Fix: read a token and use `strtof` with `errno` and `isfinite` checks.
-- `-Wparentheses-equality`: the emitter wraps comparisons in double parentheses (`if ((v_r == 0.0f))`), which clang warns about. Harmless, but it is noise a user will see in strict builds; emit single parentheses.
+None open for the rows above. (Fixed: `input` no longer uses `scanf("%f")`; comparisons no longer get a second pair of parentheses.) Row 23 (forward progress) remains open.
 
 ## Verification strategy
 

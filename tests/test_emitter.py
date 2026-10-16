@@ -5,7 +5,7 @@ def c_source(compiler, source):
 def test_block_variables_are_declared_at_the_top_of_the_c_block(compiler):
     source = c_source(compiler, "if 1 > 0 {\n    a = 1\n    b = a + 1\n}\n")
     assert (
-        "    if ((1.0f > 0.0f)) {\n"
+        "    if (1.0f > 0.0f) {\n"
         "        float v_a = 0;\n"
         "        float v_b = 0;\n"
         "        v_a = 1.0f;\n"
@@ -44,9 +44,9 @@ if x > 0 {
     print "o"
 }
 ''')
-    assert "    if ((v_x > 0.0f)) {\n" in source
-    assert "    } else if ((v_x < 0.0f)) {\n" in source
-    assert "    } else if ((v_x == 0.0f)) {\n" in source
+    assert "    if (v_x > 0.0f) {\n" in source
+    assert "    } else if (v_x < 0.0f) {\n" in source
+    assert "    } else if (v_x == 0.0f) {\n" in source
     assert "    } else {\n" in source
     assert source.count("else if") == 2
 
@@ -61,13 +61,13 @@ def test_standalone_block_emits_its_own_braces(compiler):
 
 
 def test_empty_block_emits_empty_braces(compiler):
-    assert "    if ((1.0f > 0.0f)) {\n    }\n" in c_source(compiler, "if 1 > 0 {\n}\n")
+    assert "    if (1.0f > 0.0f) {\n    }\n" in c_source(compiler, "if 1 > 0 {\n}\n")
 
 
 def test_nested_blocks_indent_one_level_per_block(compiler):
     source = c_source(compiler, "x = 1\nif x > 0 {\n    while x > 0 {\n        x = x - 1\n    }\n}\n")
-    assert "    if ((v_x > 0.0f)) {\n" in source
-    assert "        while ((v_x > 0.0f)) {\n" in source
+    assert "    if (v_x > 0.0f) {\n" in source
+    assert "        while (v_x > 0.0f) {\n" in source
     assert "            v_x = (v_x - 1.0f);\n" in source
 
 
