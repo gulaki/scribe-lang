@@ -160,6 +160,8 @@ EXAMPLE_RUNS = {
     "gcd": ("48\n18\n", "Enter two positive whole numbers:\ngcd =\n6.00\n"),
     "scopes": ("", "10.00\n2.00\n0.00\n1.00\n4.00\n"),
     "nested_loops": ("", "6.00\n12.00\n18.00\n"),
+    "primes": ("30\n", "Print primes up to:\n" + "".join(f"{p}.00\n" for p in (2, 3, 5, 7, 11, 13, 17, 19, 23, 29))),
+    "newton_sqrt": ("144\n", "Square root of (a number >= 0):\n12.00\n"),
     "sum_avg": ("3\n1\n2\n6\n", "How many numbers?\n" + "\nEnter number:\n" * 3 + "Sum =\n9.00\nAverage =\n3.00\n"),
 }
 

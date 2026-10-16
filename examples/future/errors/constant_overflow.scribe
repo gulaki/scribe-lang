@@ -1,0 +1,3 @@
+# PROPOSAL: constant overflow is caught at compile time.
+#   error: 9223372036854775808 does not fit in int (max 9223372036854775807)
+n: int = 9223372036854775808

@@ -1,0 +1,25 @@
+# PROPOSAL (v0.6): tagged unions and exhaustive match.
+# A union is a C struct { tag; union { ... } }; the tag is always checked.
+
+type Number = int | float
+
+fn double(n: Number) -> Number {
+    match n {
+        int i   => return i * 2
+        float f => return f * 2.0
+    }                          # missing a case would be a compile error
+}
+
+fn parse(text: string) -> int | ParseError {
+    # ...
+}
+
+r := parse("42")
+match r {
+    int i        => print i
+    ParseError e => print "bad input: " + e.message
+}
+
+# A union argument to a plain overloaded call is allowed only if EVERY member
+# resolves; the compiler then emits the dispatch switch itself.
+print describe(double(21))
