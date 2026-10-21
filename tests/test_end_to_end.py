@@ -163,6 +163,7 @@ EXAMPLE_RUNS = {
     "nested_loops": ("", "6\n12\n18\n"),
     "primes": ("30\n", "Print primes up to:\n" + "".join(f"{p}\n" for p in (2, 3, 5, 7, 11, 13, 17, 19, 23, 29))),
     "newton_sqrt": ("144\n", "Square root of (a number >= 0):\n12.00\n"),
+    "types": ("", "2\n1\n7.50\n14\n7\n26\n3\n3.50\n"),
     "sum_avg": ("3\n1\n2\n6\n", "How many numbers?\n" + "\nEnter number:\n" * 3 + "Sum =\n9.00\nAverage =\n3.00\n"),
 }
 

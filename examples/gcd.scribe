@@ -1,7 +1,6 @@
 # Euclid's algorithm by repeated subtraction: if inside while, else branch.
 print "Enter two positive whole numbers:"
-a = 0                  # integers, so `input` reads whole numbers
-b = 0
+i64: a, b              # declared, so `input` reads whole numbers
 input a
 input b
 while a != b {

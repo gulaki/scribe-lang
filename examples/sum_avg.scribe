@@ -1,10 +1,8 @@
 print "How many numbers?"
-N = 0                  # how many: an integer
+i64: N, i              # counts are integers
+f64: num, sum          # the numbers themselves are f64
 input N
 
-i = 0
-num = 0.0              # the numbers themselves are f64
-sum = 0.0
 while i < N {
     print "\nEnter number:"
     input num

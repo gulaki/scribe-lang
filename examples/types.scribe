@@ -1,0 +1,25 @@
+# A tour of the scalar types: declarations, inference, casts, and chained
+# and multiple assignment.
+
+i64: count, limit = 5        # declared: count starts at 0
+f64: total                   # 0.0
+ratio = 0.5f                 # inferred from the literal: f32
+
+low = high = 7               # chained: high = 7, then low = high; both i64
+x, y = 1, 2                  # multiple assignment
+x, y = y, x                  # both values are read first, so this swaps
+print x
+print y
+
+while count < limit {
+    count = count + 1
+    # count is an i64, so it needs a cast to mix with floats; ratio, an
+    # f32, widens to f64 on its own.
+    total = total + f64(count) * ratio
+}
+print total
+print low + high
+print i64(total)             # back to an integer: truncates toward zero
+print 0x10 + 0o10 + 0b10     # Python-style literals: 16 + 8 + 2
+print 7 / 2                  # integer division truncates
+print 7.0 / 2                # float division
