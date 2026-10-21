@@ -8,8 +8,9 @@ from lark import Lark, Transformer, Token
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 from .ast import (
-    Binary, Block, Comparison, Elif, Goto, Grouped, If, Input, Label, Let,
-    Number, Print, Program, SourceLocation, Stmt, Unary, Variable, While,
+    Binary, Block, Cast, Comparison, Elif, FloatLit, Goto, Grouped, If, Input,
+    IntLit, Label, Let, Print, Program, SourceLocation, Stmt, Unary, Variable,
+    While,
 )
 from . import diagnostics as codes
 from .diagnostics import Diagnostics, Span
@@ -100,8 +101,21 @@ class ASTBuilder(Transformer):
             return items[0]
         return Unary(str(items[0]), items[1], _loc(items[0]))
 
-    def number(self, items):
-        return Number(str(items[0]), _loc(items[0]))
+    def int_literal(self, items):
+        text = str(items[0])
+        return IntLit(int(text, 0), text, _loc(items[0]))
+
+    def float_literal(self, items):
+        text = str(items[0]).replace("_", "")
+        is_f32 = text.endswith("f")
+        return FloatLit(text.removesuffix("f"), is_f32, _loc(items[0]))
+
+    def cast_type(self, items):
+        return items[0]
+
+    def cast(self, items):
+        type_token, operand = items
+        return Cast(str(type_token), operand, _loc(type_token))
 
     def variable(self, items):
         return Variable(str(items[0]), _loc(items[0]))
@@ -126,9 +140,9 @@ def _fold_binary(items):
         return items[0]
     node = items[0]
     for i in range(1, len(items), 2):
-        op = str(items[i])
+        op = items[i]
         rhs = items[i + 1]
-        node = Binary(node, op, rhs, getattr(node, "location", SourceLocation()))
+        node = Binary(node, str(op), rhs, getattr(node, "location", SourceLocation()), _loc(op))
     return node
 
 
@@ -265,7 +279,8 @@ _TERMINAL_WORDS = {
     "SEMICOLON": "';'",
     "$END": "end of file",
     "IDENT": "a name",
-    "NUMBER": "a number",
+    "INT_LIT": "a number",
+    "FLOAT_LIT": "a number",
     "STRING": "a string",
     "LBRACE": "'{'",
     "RBRACE": "'}'",
@@ -277,12 +292,12 @@ _TERMINAL_WORDS = {
     "MUL_OP": "an operator",
     "SIGN": "'+' or '-'",
 }
-_KEYWORDS = {"PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO"}
+_KEYWORDS = {"PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO", "I64", "F32", "F64"}
 
 # When every terminal of a group is expected, say the group's name instead.
 _GROUPS = [
     ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE"}),
-    ("an expression", {"NUMBER", "IDENT", "LPAR", "SIGN"}),
+    ("an expression", {"INT_LIT", "FLOAT_LIT", "IDENT", "LPAR", "SIGN", "I64", "F32", "F64"}),
 ]
 
 
@@ -293,7 +308,7 @@ def _terminal_word(name: str) -> str:
 
 
 def describe_expected(expected: set[str]) -> str:
-    """`{'IDENT', 'NUMBER', 'LPAR', 'SIGN'}` -> "an expression"."""
+    """`{'IDENT', 'INT_LIT', 'LPAR', ...}` -> "an expression"."""
     remaining = set(expected)
     words: list[str] = []
     for word, group in _GROUPS:
@@ -315,7 +330,7 @@ def describe_expected(expected: set[str]) -> str:
 def describe_token(token: Token) -> str:
     if token.type == "IDENT":
         return f"name '{token}'"
-    if token.type == "NUMBER":
+    if token.type in ("INT_LIT", "FLOAT_LIT"):
         return f"number {token}"
     if token.type == "STRING":
         return f"string {token}"

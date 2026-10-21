@@ -46,7 +46,7 @@ def _register(code: str, name: str, template: str, severity: Severity = Severity
 
 # Codes are grouped by hundreds and never reused or renumbered once released.
 #   E00xx  driver and internal   E01xx  syntax       E02xx  names and scopes
-#   E03xx  labels and goto       E04xx  literals
+#   E03xx  labels and goto       E04xx  literals     E05xx  types
 
 INTERNAL_ERROR = _register("E0001", "internal-error", "internal compiler error: {detail}")
 CANNOT_READ_SOURCE = _register("E0002", "cannot-read-source", "cannot read {path}: {reason}")
@@ -70,7 +70,16 @@ GOTO_INTO_BLOCK = _register(
     "goto '{name}' jumps into a nested block; a goto may only jump within its own block or out to an enclosing block",
 )
 
-NUMBER_TOO_LARGE = _register("E0401", "number-too-large", "number {value} is too large for a float")
+NUMBER_TOO_LARGE = _register("E0401", "number-too-large", "number {value} does not fit in {type}")
+
+TYPE_MISMATCH = _register(
+    "E0501", "type-mismatch", "cannot assign a value of type {found} to '{name}', which has type {expected}",
+)
+NO_COMMON_TYPE = _register("E0502", "no-common-type", "'{op}' cannot mix {left} and {right}")
+CONSTANT_OVERFLOW = _register("E0503", "constant-overflow", "constant expression {value} does not fit in {type}")
+CONSTANT_DIVISION_BY_ZERO = _register(
+    "E0504", "constant-division-by-zero", "division by zero in a constant expression",
+)
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,2 @@
+# expect: E0504 at 2:14
+average = 10 / 0

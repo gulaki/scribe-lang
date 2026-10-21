@@ -82,7 +82,7 @@ def test_diagnostic_without_a_location():
 
 
 def test_missing_filename_is_shown_as_input():
-    diags = one(d.NUMBER_TOO_LARGE, loc(1, 5), filename=None, value="1e99")
+    diags = one(d.NUMBER_TOO_LARGE, loc(1, 5), filename=None, value="1e99", type="f32")
     assert render_text(diags).startswith("<input>:1:5: error[E0401]:")
 
 

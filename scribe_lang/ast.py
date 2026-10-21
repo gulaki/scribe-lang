@@ -104,8 +104,21 @@ class Expr(Node):
 
 
 @dataclass(frozen=True)
-class Number(Expr):
-    value: str
+class IntLit(Expr):
+    """An integer literal. `text` is the spelling, for messages."""
+
+    value: int
+    text: str = ""
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class FloatLit(Expr):
+    """A float literal. `text` is the spelling without `_` or the `f` suffix;
+    `is_f32` is True when it had the suffix (`2.5f`)."""
+
+    text: str
+    is_f32: bool = False
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
@@ -134,6 +147,8 @@ class Binary(Expr):
     operator: str
     right: Expr
     location: SourceLocation = field(default_factory=SourceLocation)
+    # Where the operator is, for type errors and runtime error messages.
+    operator_location: SourceLocation = field(default_factory=SourceLocation, compare=False)
 
 
 @dataclass(frozen=True)
@@ -141,6 +156,15 @@ class Comparison(Expr):
     left: Expr
     operator: str
     right: Expr
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class Cast(Expr):
+    """`f64(x)`: converts `operand` to the type called `type_name`."""
+
+    type_name: str
+    operand: Expr
     location: SourceLocation = field(default_factory=SourceLocation)
 
 

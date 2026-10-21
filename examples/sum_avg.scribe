@@ -3,8 +3,8 @@ N = 0                  # how many: an integer
 input N
 
 i = 0
-num = 0
-sum = 0
+num = 0.0              # the numbers themselves are f64
+sum = 0.0
 while i < N {
     print "\nEnter number:"
     input num
@@ -14,6 +14,6 @@ while i < N {
 print "Sum ="
 print sum
 
-avg = sum / N
+avg = sum / f64(N)     # f64 / i64 does not mix: convert N explicitly
 print "Average ="
 print avg

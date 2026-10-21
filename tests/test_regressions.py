@@ -18,44 +18,47 @@ def c_source(compiler, source):
 
 
 # -- Bug 1: number literals were emitted as C `int` literals ----------------
-# Every Scribe value is a float, but `7` was emitted as the C int `7`, so
-# arithmetic on literals used C integer rules.
+# `7` was emitted as the C int `7`, so arithmetic on literals used C `int`
+# rules and could overflow, which is undefined. Literals now get a Scribe type
+# (i64 or f64, see docs/design/type-system.md) and integer constant
+# expressions are folded exactly, so C never does arithmetic on a bare literal.
 
-def test_division_of_literals_is_float_division(run_scribe):
-    assert run_scribe("print 7 / 2\n") == "3.50\n"
+def test_division_of_float_literals_is_float_division(run_scribe):
+    assert run_scribe("print 7.0 / 2\n") == "3.50\n"
 
 
-def test_literal_division_by_zero_is_not_integer_division(run_scribe):
-    # Integer division by zero is undefined behaviour in C; float division
-    # gives infinity.
-    assert run_scribe("print 1 / 0\n") == "inf\n"
+def test_literal_division_by_zero_is_rejected_not_undefined(compiler, run_scribe):
+    assert [d.code.code for d in compiler.compile("print 1 / 0\n").diagnostics] == ["E0504"]
+    assert run_scribe("print 1.0 / 0\n") == "inf\n"
 
 
 def test_literal_multiplication_does_not_overflow_int(run_scribe):
-    assert run_scribe("print 65536 * 65536\n") == "4294967296.00\n"
+    assert run_scribe("print 65536 * 65536\n") == "4294967296\n"
 
 
-def test_literal_wider_than_any_c_integer_compiles(run_scribe):
-    assert run_scribe("print 99999999999999999999\n") == "100000002004087734272.00\n"
+def test_literal_wider_than_any_c_integer(compiler, run_scribe):
+    assert [d.code.code for d in compiler.compile("print 99999999999999999999\n").diagnostics] == ["E0401"]
+    assert run_scribe("print 99999999999999999999.0\n") == "100000000000000000000.00\n"
 
 
-def test_comparison_of_literals_uses_float_values(run_scribe):
-    assert run_scribe('if 7 / 2 == 3 {\n    print "int"\n} else {\n    print "float"\n}\n') == "float\n"
+def test_comparison_of_literals_uses_their_values(run_scribe):
+    assert run_scribe('if 7.0 / 2 == 3 {\n    print "int"\n} else {\n    print "float"\n}\n') == "float\n"
+    assert run_scribe('if 7 / 2 == 3 {\n    print "int"\n} else {\n    print "float"\n}\n') == "int\n"
 
 
-@pytest.mark.parametrize("literal, expected", [("7", "7.0f"), ("0", "0.0f"), ("2.5", "2.5f")])
-def test_number_literals_are_emitted_as_c_float_literals(compiler, literal, expected):
+@pytest.mark.parametrize("literal, expected", [("7", "INT64_C(7)"), ("0", "INT64_C(0)"), ("2.5", "2.5"), ("2.5f", "2.5f")])
+def test_number_literals_are_emitted_with_their_c_type(compiler, literal, expected):
     assert f"v_x = {expected};" in c_source(compiler, f"x = {literal}\n")
 
 
 def test_literal_too_large_for_a_float_is_rejected(compiler):
-    result = compiler.compile("x = " + "9" * 50 + "\n")
+    result = compiler.compile("x = 1e39f\n")
     assert [d.code.code for d in result.diagnostics] == ["E0401"]
-    assert "too large" in result.diagnostics[0].message
+    assert "does not fit in f32" in result.diagnostics[0].message
 
 
 def test_largest_float_literal_is_accepted(compiler):
-    compiler.compile("x = 340282346638528859811704183484516925440\n")
+    assert compiler.compile("x = 340282346638528859811704183484516925440.0f\n").ok
 
 
 # -- Bug 2: string `print` used the text as a printf format string ----------
@@ -124,7 +127,7 @@ def test_escaped_backslash_followed_by_n_is_not_a_newline(run_scribe):
     "EOF", "NULL", "FILE", "__x", "_X",
 ])
 def test_variables_named_like_c_identifiers_work(run_scribe, name):
-    assert run_scribe(f"{name} = 3\nprint {name} + 1\n") == "4.00\n"
+    assert run_scribe(f"{name} = 3\nprint {name} + 1\n") == "4\n"
 
 
 @pytest.mark.parametrize("name", ["EOF", "int", "main", "BUFSIZ", "L_tmpnam"])
@@ -134,12 +137,12 @@ def test_labels_named_like_c_identifiers_work(run_scribe, name):
 
 
 def test_block_variable_named_like_a_c_identifier_works(run_scribe):
-    assert run_scribe("{\n    char = 2\n    input double\n    print char * double\n}\n", "5\n") == "10.00\n"
+    assert run_scribe("{\n    short = 2.0\n    input double\n    print short * double\n}\n", "5\n") == "10.00\n"
 
 
 def test_variable_and_label_with_the_same_name(run_scribe):
     program = "x = 0\nlabel x\nx = x + 1\nif x < 3 {\n    goto x\n}\nprint x\n"
-    assert run_scribe(program) == "3.00\n"
+    assert run_scribe(program) == "3\n"
 
 
 # -- Bug 6: build files pointed at the wrong paths --------------------------
@@ -235,7 +238,7 @@ def test_input_never_misreads_or_overflows(run_scribe, stdin, expected):
 
 
 def test_input_helper_only_emitted_when_used(compiler):
-    assert "scribe_read_float" not in c_source(compiler, "print 1\n")
+    assert "scribe_read" not in c_source(compiler, "print 1\n")
     assert "scanf" not in c_source(compiler, "input x\n")
 
 
@@ -244,9 +247,9 @@ def test_input_helper_only_emitted_when_used(compiler):
 
 def test_conditions_have_a_single_pair_of_parentheses(compiler):
     source = c_source(compiler, "x = 1\nif x == 1 {\n    print x\n}\nwhile x < 3 {\n    x = x + 1\n}\n")
-    assert "if (v_x == 1.0f) {" in source
-    assert "while (v_x < 3.0f) {" in source
-    assert "((" not in source.replace("(float)((", "")
+    assert "if (v_x == INT64_C(1)) {" in source
+    assert "while (v_x < INT64_C(3)) {" in source
+    assert "((" not in source[source.index("int main"):]
 
 
 def test_generated_c_builds_without_any_warning(compiler, tmp_path):

@@ -221,7 +221,7 @@ def test_parse_without_a_collector_raises_with_the_diagnostics():
 
 
 @pytest.mark.parametrize("expected, words", [
-    ({"IDENT", "NUMBER", "LPAR", "SIGN"}, "an expression"),
+    ({"IDENT", "INT_LIT", "FLOAT_LIT", "LPAR", "SIGN", "I64", "F32", "F64"}, "an expression"),
     ({"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "RBRACE", "_NL"},
      "a statement, '}' or end of line"),
     ({"_NL", "SEMICOLON", "$END"}, "end of line"),

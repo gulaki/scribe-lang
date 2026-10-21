@@ -1,0 +1,8 @@
+# No type holds every i64 and every f64 exactly, so mixing them needs a cast:
+# f64(n) * x to work in f64, or n * i64(x) to work in i64.
+# expect: E0502 at 7:9
+# expect: E0502 at 8:9
+n = 3
+x = 0.5
+print n * x
+print n + 0.5

@@ -45,7 +45,7 @@ while i < 3 {
     i = i + 1
 }
 '''
-    assert run_scribe(program) == "1.00\n1.00\n1.00\n"
+    assert run_scribe(program) == "1\n1\n1\n"
 
 
 def test_inner_block_updates_outer_variable(run_scribe):
@@ -60,7 +60,7 @@ while i <= 4 {
 }
 print total
 '''
-    assert run_scribe(program) == "7.00\n"
+    assert run_scribe(program) == "7\n"
 
 
 def test_sibling_blocks_and_a_later_program_level_variable_are_independent(run_scribe):
@@ -76,7 +76,7 @@ if x > 0 {
 t = 5
 print t
 '''
-    assert run_scribe(program) == "10.00\n5.00\n"
+    assert run_scribe(program) == "10\n5\n"
 
 
 def test_block_variable_that_shares_a_name_with_a_later_global_does_not_leak(run_scribe):
@@ -88,12 +88,12 @@ if 1 > 0 {
 v = 1
 print v
 '''
-    assert run_scribe(program) == "7.00\n1.00\n"
+    assert run_scribe(program) == "7\n1\n"
 
 
 def test_standalone_block_scope(run_scribe):
     program = 'x = 1\n{\n    x = x + 1\n    y = 10\n    print y\n}\nprint x\n'
-    assert run_scribe(program) == "10.00\n2.00\n"
+    assert run_scribe(program) == "10\n2\n"
 
 
 def test_goto_out_of_a_nested_block(run_scribe):
@@ -108,7 +108,7 @@ if i <= n {
     goto loop
 }
 '''
-    assert run_scribe(program, "3\n") == "1.00\n2.00\n3.00\n"
+    assert run_scribe(program, "3\n") == "1\n2\n3\n"
 
 
 def test_label_at_the_end_of_a_block_is_valid_strict_c(run_scribe):
@@ -128,7 +128,7 @@ def test_goto_inside_a_block_never_skips_a_declaration(run_scribe):
     # `a` is declared at the top of the block, so jumping over its first
     # assignment leaves it at 0 rather than uninitialised.
     program = '{\n    goto skip\n    a = 7\n    label skip\n    print a\n}\n'
-    assert run_scribe(program) == "0.00\n"
+    assert run_scribe(program) == "0\n"
 
 
 def test_input_into_a_block_variable(run_scribe):
@@ -150,18 +150,18 @@ a = 1
     }
 }
 '''
-    assert run_scribe(program) == "4.00\n"
+    assert run_scribe(program) == "4\n"
 
 
 EXAMPLE_RUNS = {
-    "factorial": ("5\n", "Enter number to calculate factorial:\n\nFactorial = \n120.00\n"),
-    "fibonacci": ("6\n", "How many fibonacci numbers do you want?\n\n0.00\n1.00\n1.00\n2.00\n3.00\n5.00\n"),
-    "loop_goto": ("3\n", "Enter number: \n1.00\n2.00\n3.00\n"),
+    "factorial": ("5\n", "Enter number to calculate factorial:\n\nFactorial = \n120\n"),
+    "fibonacci": ("6\n", "How many fibonacci numbers do you want?\n\n0\n1\n1\n2\n3\n5\n"),
+    "loop_goto": ("3\n", "Enter number: \n1\n2\n3\n"),
     "classify": ("85\n", "Enter a score from 0 to 100:\ngrade B\n"),
-    "gcd": ("48\n18\n", "Enter two positive whole numbers:\ngcd =\n6.00\n"),
-    "scopes": ("", "10.00\n2.00\n0.00\n1.00\n4.00\n"),
-    "nested_loops": ("", "6.00\n12.00\n18.00\n"),
-    "primes": ("30\n", "Print primes up to:\n" + "".join(f"{p}.00\n" for p in (2, 3, 5, 7, 11, 13, 17, 19, 23, 29))),
+    "gcd": ("48\n18\n", "Enter two positive whole numbers:\ngcd =\n6\n"),
+    "scopes": ("", "10\n2\n0\n1\n4\n"),
+    "nested_loops": ("", "6\n12\n18\n"),
+    "primes": ("30\n", "Print primes up to:\n" + "".join(f"{p}\n" for p in (2, 3, 5, 7, 11, 13, 17, 19, 23, 29))),
     "newton_sqrt": ("144\n", "Square root of (a number >= 0):\n12.00\n"),
     "sum_avg": ("3\n1\n2\n6\n", "How many numbers?\n" + "\nEnter number:\n" * 3 + "Sum =\n9.00\nAverage =\n3.00\n"),
 }

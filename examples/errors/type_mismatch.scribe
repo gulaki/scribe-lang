@@ -1,0 +1,8 @@
+# A variable keeps the type of its first assignment. `count` is an i64, so it
+# cannot hold 2.5, and an i64 does not widen to f64 without a cast.
+# expect: E0501 at 6:9
+# expect: E0501 at 8:9
+count = 1
+count = 2.5
+ratio = 0.5
+ratio = count            # write f64(count)

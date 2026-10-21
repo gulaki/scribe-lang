@@ -50,10 +50,32 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0301 | undeclared-label | `goto` names a label that does not exist. |
 | E0302 | duplicate-label | Two labels have the same name. A note points at the first one, which stays in effect. |
 | E0303 | goto-into-block | `goto` may only jump within its own block or out to an enclosing one. A note points at the label. |
-| E0401 | number-too-large | A number literal is too large for a float (about 3.4e38). |
+| E0401 | number-too-large | A literal does not fit the type it gets: an integer beyond i64, a float that rounds to infinity (above about 1.8e308 for f64, 3.4e38 for f32), or an integer that is not exact in the float type it meets (`f + 16777217` with `f` an f32). |
+| E0501 | type-mismatch | An assignment whose value does not convert losslessly to the variable's type, which was fixed by its first assignment. A note points at that assignment. Convert explicitly, e.g. `f64(n)`. |
+| E0502 | no-common-type | An operator or comparison mixes types that no type holds exactly, such as i64 and f64. Convert one side with a cast. |
+| E0503 | constant-overflow | An integer constant expression, computed exactly, has a result that does not fit its type. |
+| E0504 | constant-division-by-zero | Division by zero in an integer constant expression, such as `10 / 0`. |
 
 Codes are grouped by hundreds: `E00xx` driver and internal, `E01xx` syntax,
-`E02xx` names and scopes, `E03xx` labels and `goto`, `E04xx` literals. Warnings,
+`E02xx` names and scopes, `E03xx` labels and `goto`, `E04xx` literals,
+`E05xx` types.
+
+## Runtime errors
+
+Some mistakes can only be detected while the program runs. The generated C
+checks for them before doing the operation, because in C each one is
+undefined behaviour. A failed check prints the Scribe position and stops the
+program (`abort()`, so the exit status is nonzero):
+
+```text
+prog.scribe:4:11: runtime error: integer overflow
+```
+
+| Message | Cause |
+|---|---|
+| `integer overflow` | An i64 `+`, `-`, `*`, `/` or negation whose result does not fit, including `-9223372036854775808 / -1`. |
+| `division by zero` | An i64 division by zero. Float division by zero is defined: it gives `inf` or `nan`. |
+| `value out of range for i64` | `i64(x)` where `x` is NaN, infinite, or outside the range of i64. | Warnings,
 when there are some, will use `W` codes.
 
 ## Adding an error

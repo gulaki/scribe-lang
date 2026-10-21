@@ -68,7 +68,7 @@ def test_collector_keeps_order_and_separates_warnings():
     assert not diags.has_errors and len(diags) == 0
     diags.report(warning, None)
     assert not diags.has_errors
-    diags.error(d.NUMBER_TOO_LARGE, None, value="1e99")
+    diags.error(d.NUMBER_TOO_LARGE, None, value="1e99", type="f32")
     diags.error(d.UNDECLARED_LABEL, None, name="x")
     assert diags.has_errors
     assert [x.code.code for x in diags] == ["W9999", "E0401", "E0301"]
