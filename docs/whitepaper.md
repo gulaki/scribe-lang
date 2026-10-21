@@ -1,6 +1,6 @@
 # Scribe: a safe, readable front end for C
 
-*Design whitepaper, draft 1. Status: proposal. Today's language (v0.1) is float-only; everything beyond that is a design target.*
+*Design whitepaper, draft 1. Status: proposal. Today's language has the scalars i64, f64 and f32 (see design/type-system.md); everything beyond that is a design target.*
 
 ## 1. Thesis
 
@@ -24,7 +24,7 @@ Each point is stated, then judged: what holds, where the risks are and what we r
 ### 2.2 Explicit typing first, a little inference later
 **Agree.** Keep inference *local and one-directional*: a declaration's type comes from its own right-hand side (literal, constructor call, function return type) and never from later uses. No unification, no inference across statements. Rules: `x := 3` is `int`, `x := 3.0` is `float`, `x := Account(...)` is `Account`; everything else needs an annotation.
 
-**Risk: compatibility.** In v0.1 `7` is a float and every variable is untyped. In a typed language `7` is an int. We need an explicit edition marker (`#! scribe 0.1` vs `0.2`), with v0.1 as a legacy mode in which the old rules hold, rather than a silent reinterpretation. Numeric rules: no implicit narrowing; implicit `int -> float` widening only where lossless, otherwise explicit `float(n)`; checked arithmetic by default, wrapping only through visible operators (`+%`).
+**Compatibility (decided).** In v0.1 `7` was a float; now it is an int. Rather than an edition marker with a legacy float-only mode, the language made the breaking change before 1.0 and the examples were migrated. Numeric rules: no implicit narrowing; implicit `int -> float` widening only where lossless, otherwise explicit `float(n)`; checked arithmetic by default, wrapping only through visible operators (`+%`).
 
 ### 2.3 Typed functions with unions and overloading
 **Agree with caution: this is the riskiest combination.** Unions plus overloading plus implicit widening produces ambiguity quickly. Proposal:
@@ -87,8 +87,8 @@ Order rationale: types before functions (signatures need them), arrays before st
 
 1. **Trap vs. exceptions vs. `Result`.** Traps for contract violations; ordinary failures (parse, I/O) via `T | Error` unions. Is that enough?
 2. **Stack overflow.** Options: a depth counter in recursive functions, static call-graph bounds, or document as a limit. Probably the counter.
-3. **Integer width.** One `int` (64-bit) or sized types too (`i8`..`u64`)? Sized types matter for C interop and arrays; propose `int` plus sized types later.
-4. **Floats.** Keep `float` as binary32 (as now) or default to `double`? Binary32 is surprising for new users; revisit at 0.2.
+3. **Integer width.** Decided: sized types (`i8` ... `u64`), with i64 as the default for integer literals. i64 is implemented; the rest are next.
+4. **Floats.** Decided: `f32` and `f64`, with f64 the default for float literals (`2.5f` is f32).
 5. **C interop.** An `extern` mechanism is where pointers sneak back in. Proposal: a vetted, audited binding layer, not user-written.
 6. **Concurrency.** Out of scope until the ownership model is settled; data races are UB we simply do not offer yet.
 7. **Strings.** UTF-8 bytes with validated construction; indexing by byte or by code point?

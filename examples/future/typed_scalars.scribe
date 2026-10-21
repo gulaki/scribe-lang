@@ -1,19 +1,17 @@
-# PROPOSAL (v0.2): explicit scalar types, checked arithmetic.
-# Not supported yet. See docs/design/type-system.md.
+# PROPOSAL: the parts of the scalar types that do not exist yet.
+# i64, f64, f32, literals and casts work today; see docs/design/type-system.md.
 
-count: int = 10               # 64-bit signed
-ratio: float = 0.5            # IEEE-754 binary32
-done: bool = false
+i32: count = 10, limit          # explicit declarations, zero-initialised
+u8: mask = 0xff
+done = false                    # bool
 
-big := 3_000_000_000          # `:=` infers from a literal: int
-half := 0.5                   # float
+a = b = c = 0                   # chained assignment
+lo, hi = 0, 1                   # every right-hand side is evaluated first...
+lo, hi = hi, lo                 # ...so this swaps
 
-total: float = float(count) * ratio   # no implicit int -> float
-whole: int = int(total)               # explicit; traps if out of range or NaN
-
-# Arithmetic is checked: overflow is a defined runtime trap, never UB.
-# Operators with a % suffix opt in to wrapping, and say so at the call site.
-wrapped: int = count +% 9_223_372_036_854_775_807
+big = i64(count) * 3_000_000_000      # i32 * i64 works in i64
+ratio = f64(count) ** 0.5             # ** lowers to pow
+wrapped = mask +% 1                   # explicit wrapping: 0
 
 if count > 5 and not done {
     print "counting"
