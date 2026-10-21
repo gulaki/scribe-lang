@@ -52,6 +52,15 @@ class Let(Stmt):
 
 
 @dataclass(frozen=True)
+class ChainedLet(Stmt):
+    """`a = b = c = e`, kept as the assignments it means, in order:
+    `c = e`, `b = c`, `a = b`. The value is computed once."""
+
+    lets: tuple[Let, ...]
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
 class Declarator(Node):
     """One `name` or `name = value` of a Declaration. Not a statement itself."""
 
@@ -186,4 +195,4 @@ class Cast(Expr):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
-StmtType = Union[Print, Input, Let, Declaration, If, While, Block, Label, Goto]
+StmtType = Union[Print, Input, Let, ChainedLet, Declaration, If, While, Block, Label, Goto]

@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from .ast import (
-    Binary, Block, Cast, Comparison, Declaration, Expr, FloatLit, Goto, Grouped,
-    If, Input, Label, Let, Print, Program, SourceLocation, Unary, Variable,
-    While,
+    Binary, Block, Cast, ChainedLet, Comparison, Declaration, Expr, FloatLit,
+    Goto, Grouped, If, Input, Label, Let, Print, Program, SourceLocation,
+    Unary, Variable, While,
 )
 from . import types
 from .semantics import Scope, SemanticModel
@@ -419,6 +419,9 @@ class CEmitter:
         elif isinstance(stmt, Let):
             symbol = self._scopes[-1].lookup(stmt.name)
             self._line(f"{c_variable(stmt.name)} = {self._operand(stmt.value, symbol.type)};")
+        elif isinstance(stmt, ChainedLet):
+            for let in stmt.lets:
+                self._stmt(let)
         elif isinstance(stmt, Declaration):
             # The variable itself is declared (and zeroed) at the top of its C
             # block. Assigning here as well means the declaration gives the

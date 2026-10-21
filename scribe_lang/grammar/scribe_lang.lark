@@ -25,7 +25,8 @@ _sep: (_NL | ";")+
 
 print_stmt: PRINT (STRING | expression)
 input_stmt: INPUT IDENT
-let_stmt: IDENT "=" expression
+// `a = b = c = 0` is chained assignment: c = 0, then b = c, then a = b.
+let_stmt: (IDENT "=")+ expression
 
 // `i64: a, b = 5, c` declares a, b and c, each zero unless given a value.
 decl_stmt: type_name ":" declarator ("," declarator)*

@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from .ast import (
-    Binary, Block, Cast, Comparison, Declaration, Expr, FloatLit, Goto,
-    Grouped, If, Input, IntLit, Label, Let, Print, Program, SourceLocation,
-    Stmt, Unary, Variable, While,
+    Binary, Block, Cast, ChainedLet, Comparison, Declaration, Expr, FloatLit,
+    Goto, Grouped, If, Input, IntLit, Label, Let, Print, Program,
+    SourceLocation, Stmt, Unary, Variable, While,
 )
 from . import diagnostics as codes
 from . import types
@@ -218,8 +218,12 @@ class SemanticAnalyzer:
     def _visit_statements(self, statements: tuple[Stmt, ...], scope: Scope) -> None:
         for stmt in statements:
             if isinstance(stmt, Let):
-                info = self._infer(stmt.value, scope)  # before declaring the target
-                self._assign(stmt.name, scope, stmt.location, stmt.value, info)
+                self._let(stmt, scope)
+            elif isinstance(stmt, ChainedLet):
+                # In source order the targets are the reverse of `lets`.
+                self._check_unique([(let.name, let.location) for let in reversed(stmt.lets)])
+                for let in stmt.lets:
+                    self._let(let, scope)
             elif isinstance(stmt, Declaration):
                 self._declaration(stmt, scope)
             elif isinstance(stmt, Input):
@@ -273,6 +277,22 @@ class SemanticAnalyzer:
             scope.declare(name, location, type_)
         elif value is not None and symbol.type is not None and info is not None:
             self._check_assignment(symbol, value, info)
+
+    def _let(self, stmt: Let, scope: Scope) -> None:
+        info = self._infer(stmt.value, scope)  # before declaring the target
+        self._assign(stmt.name, scope, stmt.location, stmt.value, info)
+
+    def _check_unique(self, targets: list[tuple[str, SourceLocation]]) -> None:
+        """Report each target named again later in the same statement."""
+        first: dict[str, SourceLocation] = {}
+        for name, location in targets:
+            if name in first:
+                self._diagnostics.error(
+                    codes.DUPLICATE_TARGET, location, name=name,
+                    notes=((f"'{name}' is first assigned here", first[name]),),
+                )
+            else:
+                first[name] = location
 
     def _declaration(self, stmt: Declaration, scope: Scope) -> None:
         type_ = types.by_name(stmt.type_name)

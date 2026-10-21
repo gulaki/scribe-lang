@@ -8,9 +8,9 @@ from lark import Lark, Transformer, Token
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 from .ast import (
-    Binary, Block, Cast, Comparison, Declaration, Declarator, Elif, FloatLit,
-    Goto, Grouped, If, Input, IntLit, Label, Let, Print, Program,
-    SourceLocation, Stmt, Unary, Variable, While,
+    Binary, Block, Cast, ChainedLet, Comparison, Declaration, Declarator,
+    Elif, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let, Print,
+    Program, SourceLocation, Stmt, Unary, Variable, While,
 )
 from . import diagnostics as codes
 from .diagnostics import Diagnostics, Span
@@ -59,7 +59,15 @@ class ASTBuilder(Transformer):
         return Input(str(items[1]), _loc(items[0]))
 
     def let_stmt(self, items):
-        return Let(str(items[0]), items[1], _loc(items[0]))
+        *targets, value = items
+        if len(targets) == 1:
+            return Let(str(targets[0]), value, _loc(targets[0]))
+        # Right to left: the last target gets the value, each earlier target
+        # gets the one to its right.
+        lets = [Let(str(targets[-1]), value, _loc(targets[-1]))]
+        for target, source in zip(reversed(targets[:-1]), reversed(targets[1:])):
+            lets.append(Let(str(target), Variable(str(source), _loc(source)), _loc(target)))
+        return ChainedLet(tuple(lets), _loc(targets[0]))
 
     def decl_stmt(self, items):
         type_token, *declarators = items

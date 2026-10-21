@@ -57,10 +57,11 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0502 | no-common-type | An operator or comparison mixes types that no type holds exactly, such as i64 and f64. Convert one side with a cast. |
 | E0503 | constant-overflow | An integer constant expression, computed exactly, has a result that does not fit its type. |
 | E0504 | constant-division-by-zero | Division by zero in an integer constant expression, such as `10 / 0`. |
+| E0602 | duplicate-assignment-target | A chained or multiple assignment names the same variable twice, such as `a = b = a = 0` or `a, a = 1, 2`. A note points at the first one. |
 
 Codes are grouped by hundreds: `E00xx` driver and internal, `E01xx` syntax,
 `E02xx` names and scopes, `E03xx` labels and `goto`, `E04xx` literals,
-`E05xx` types.
+`E05xx` types, `E06xx` assignments.
 
 ## Runtime errors
 
