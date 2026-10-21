@@ -1,0 +1,420 @@
+# The Scribe language
+
+This page describes the language as it is today. Everything on it works, and
+every `scribe` example is compiled and run by the test suite
+(`tests/test_docs.py`), so the examples and their output stay correct. Plans
+and the reasons behind the rules are in the [design documents](design/).
+
+## A first program
+
+```scribe
+# stdin: 5
+print "How many?"
+i64: n
+input n
+total = 0
+i = 1
+while i <= n {
+    total = total + i
+    i = i + 1
+}
+print total
+```
+
+```output
+How many?
+15
+```
+
+Compile it to C, build it, and run it:
+
+```sh
+scribe sum.scribe -o build/sum.c
+cc -std=c11 build/sum.c -o build/sum
+echo 5 | build/sum
+```
+
+`scribe` is installed by `pip install -e .`; `python -m scribe_lang.cli` does
+the same.
+
+## Program shape
+
+- Statements are separated by newlines or `;`, so a short block fits on one
+  line: `if x > 0 { print x; x = x - 1 }`.
+- `#` starts a comment that runs to the end of the line.
+- A `{` must be on the same line as the `if`, `elif`, `else` or `while` it
+  belongs to, and `}` must be on the same line as an `elif` or `else` that
+  follows it: `} else {`.
+
+## Printing
+
+`print` takes a string or a value. A string is printed as written, followed
+by a newline. Its escapes are `\"`, `\\`, `\n`, `\r` and `\t`. Integers print
+as integers and floats with two decimals.
+
+```scribe
+print "100% sure, and \"quoted\""
+print 7
+print 2.5
+print 1.0 / 0
+```
+
+```output
+100% sure, and "quoted"
+7
+2.50
+inf
+```
+
+## Input
+
+`input x` reads one whitespace-separated token as a value of `x`'s type. A
+token that is not a valid value of that type reads as 0: text, `4.5` for an
+integer, a number out of range, `nan`, `inf`, or the end of the input. If `x`
+does not exist yet, `input x` creates it as an `f64`. To read a whole number,
+declare it first.
+
+```scribe
+# stdin: 42\n2.5\nhello
+i64: n
+input n
+input x
+f32: y
+input y
+print n
+print x
+print y
+```
+
+```output
+42
+2.50
+0.00
+```
+
+## Variables
+
+### Assignment declares
+
+The first assignment to a name creates the variable, and its value gives the
+variable its type for good. Later assignments must fit that type without
+losing anything.
+
+```scribe
+count = 0        # i64
+ratio = 0.5      # f64
+ratio = 3        # fine: 3 is exactly 3.0
+print count
+print ratio
+```
+
+```output
+0
+3.00
+```
+
+```scribe-error
+# expect: E0501 at 3:9
+count = 0
+count = 2.5
+```
+
+### Declarations
+
+`type: names` declares variables explicitly. Each starts at zero unless it is
+given a value, and later names can use earlier ones.
+
+```scribe
+i64: a, b = 5, c
+f64: x, y = 2.5
+i64: lo = 1, hi = lo + 9
+print a
+print b
+print y
+print hi
+```
+
+```output
+0
+5
+2.50
+10
+```
+
+A declaration always makes a new variable, and Scribe has no shadowing, so a
+name that is already visible cannot be declared again:
+
+```scribe-error
+# expect: E0203 at 3:6
+total = 0
+i64: total
+```
+
+A declaration runs like any statement: when it runs again, for example in a
+loop body or after a `goto`, the variable gets its starting value again.
+
+### Chained assignment
+
+`a = b = c = value` means `c = value`, then `b = c`, then `a = b`. The value
+is computed once, and a new variable takes the type of the one to its right.
+
+```scribe
+low = high = 7
+print low + high
+```
+
+```output
+14
+```
+
+### Multiple assignment
+
+`a, b = x, y` computes every value first, left to right, and then assigns
+them. So `a, b = b, a` swaps, and the values always see the old variables.
+
+```scribe
+a, b = 0, 1
+i = 0
+while i < 10 {
+    a, b = b, a + b
+    i = i + 1
+}
+print a
+x, y = 1, 2
+x, y = y, x
+print x
+```
+
+```output
+55
+2
+```
+
+Because the values come first, they cannot use a variable that the same
+statement creates. Names and values must match in number, and no name may
+appear twice:
+
+```scribe-error
+# expect: E0201 at 4:20
+# expect: E0601 at 5:1
+a, b = 1, 2
+temp, a, b = a, b, temp
+c, d = 1
+```
+
+## Scope
+
+- `{ ... }` opens a scope, and the program itself is the outermost one. The
+  bodies of `if`, `elif`, `else` and `while` are scopes too.
+- An assignment to a name that is visible changes that variable. Otherwise it
+  creates a new variable in the innermost scope. A declaration always creates
+  one, and it is an error if the name is visible.
+- A variable disappears when its block ends, and the blocks of an
+  `if`/`elif`/`else` chain are separate scopes.
+- The value of an assignment is checked first, so `x = x + 1` is an error
+  unless `x` already exists.
+- Conditions are evaluated in the scope that encloses the block.
+- Every variable starts at 0, including one first assigned inside a block,
+  on every pass through that block.
+
+```scribe
+x = 1
+{
+    x = x + 1      # x is visible: this changes it
+    y = 10         # new: y belongs to this block
+    print y
+}
+print x
+```
+
+```output
+10
+2
+```
+
+## Types
+
+| Type | What it is |
+|---|---|
+| `i64` | 64-bit signed integer. Arithmetic is checked: overflow stops the program. |
+| `f64` | 64-bit IEEE 754 float. |
+| `f32` | 32-bit IEEE 754 float. |
+
+### Literals
+
+Numbers use Python's syntax: `1_000_000`, `0x1f`, `0o17`, `0b101`, `2.5`,
+`.5`, `5.`, `1e-3`. A trailing `f` makes a float literal an `f32`: `2.5f`. A
+decimal number cannot start with `0`, because in C `017` would mean 15; write
+`17`, or `0o17` for octal.
+
+A literal takes the type that its context needs, as long as its value fits
+exactly. On its own, an integer literal is an `i64` and a float literal an
+`f64`.
+
+```scribe
+print 0x10 + 0o10 + 0b10
+f = 1.5f
+print f + 2        # 2 becomes an f32
+```
+
+```output
+26
+3.50
+```
+
+### Constants and division
+
+Integer expressions made only of literals are computed exactly when the
+program is compiled, so only the final value has to fit in an `i64`. Integer
+division truncates toward zero, and float division does not.
+
+```scribe
+print 7 / 2
+print -7 / 2
+print 7.0 / 2
+print -9223372036854775808
+print 4294967296 * 4294967296 / 4294967296
+```
+
+```output
+3
+-3
+3.50
+-9223372036854775808
+4294967296
+```
+
+### Mixing types
+
+An operator or a comparison on two types works in the smallest type that
+holds every value of both. `f32 + f64` is an `f64`. No type holds every
+`i64` and every `f64` exactly, so mixing them needs a cast:
+
+```scribe-error
+# expect: E0502 at 4:9
+n = 3
+x = 0.5
+print n * x
+```
+
+### Casts
+
+A cast is written like a call: `i64(x)`, `f64(n)`, `f32(x)`.
+
+| Cast | Result |
+|---|---|
+| `f64(n)`, `f32(n)` from an integer | the nearest float |
+| `f64(x)` from an `f32` | exact |
+| `f32(x)` from an `f64` | the nearest `f32`; out of range gives ±inf |
+| `i64(x)` from a float | truncated toward zero; NaN or out of range stops the program |
+
+```scribe
+n = 3
+x = 0.5
+print f64(n) * x
+print i64(2.75)
+print i64(-2.75)
+```
+
+```output
+1.50
+2
+-2
+```
+
+## Operators
+
+From tightest to loosest:
+
+1. `( ... )`, casts
+2. unary `-` and `+`
+3. `*` `/`
+4. `+` `-`
+5. comparisons `==` `!=` `<` `<=` `>` `>=`, only as the condition of `if`,
+   `elif` and `while`
+
+## Control flow
+
+`if`/`elif`/`else` runs the first branch whose condition holds. `while`
+repeats its body while its condition holds. A bare `{ ... }` is just a scope.
+
+```scribe
+score = 85
+if score >= 90 {
+    print "A"
+} elif score >= 80 {
+    print "B"
+} else {
+    print "C"
+}
+```
+
+```output
+B
+```
+
+`label name` marks a place and `goto name` jumps to it. Labels share one
+namespace for the whole program. A `goto` may jump within its own block or
+out to an enclosing one, but never into a nested block.
+
+```scribe
+i = 1
+label again
+print i
+i = i + 1
+if i <= 3 {
+    goto again
+}
+```
+
+```output
+1
+2
+3
+```
+
+## Runtime errors
+
+Some mistakes can only be found while the program runs. The program checks
+for them before doing the operation, prints where it happened, and stops
+with a nonzero exit status:
+
+- integer overflow in `+`, `-`, `*`, `/` or negation, including
+  `-9223372036854775808 / -1`;
+- integer division by zero (float division by zero gives `inf` or `nan`);
+- `i64(x)` where `x` is NaN, infinite or out of range.
+
+```text
+prog.scribe:4:11: runtime error: integer overflow
+```
+
+Compile-time errors are listed in [errors.md](errors.md).
+
+## Reserved words
+
+These cannot be used as names: `print`, `input`, `if`, `elif`, `else`,
+`while`, `label`, `goto`, and the type names `i8`, `i16`, `i32`, `i64`, `u8`,
+`u16`, `u32`, `u64`, `f16`, `f32`, `f64`, `f128`, `bool`, `char`, `byte` and
+`str`. Only `i64`, `f64` and `f32` are usable types so far; the others are
+reserved for later.
+
+## Not available yet
+
+| Feature | Plan |
+|---|---|
+| A condition that is not a comparison (`while n {`), `bool`, `true`/`false`, `and`/`or`/`not` | [next steps](design/type-system.md#status-and-next-steps), task 2 |
+| `i8` ... `i32`, `u8` ... `u64` (`char` and `byte` are `u8`) | task 3 |
+| `**` | task 6 |
+| `f16`, `f128` | task 7 |
+| `%`, wrapping operators (`+%`) | [type-system.md](design/type-system.md#runtime-checks) |
+| functions, arrays, strings as values, structs, classes | [whitepaper roadmap](whitepaper.md#4-roadmap) |
+
+## How a program becomes C
+
+Each Scribe variable `x` becomes the C variable `v_x`, and each label `top`
+becomes `l_top`, so no Scribe name can clash with C. Program-level variables
+are zero-initialised globals. A variable from a block is declared, set to
+zero, at the top of that C block, so a `goto` can never skip its declaration.
+Integer arithmetic calls small checked helpers such as `scribe_add_i64`,
+emitted only when a program uses them. The C compiles cleanly with
+`cc -std=c11 -pedantic-errors -Wall -Wextra`.

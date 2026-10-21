@@ -82,3 +82,12 @@ def test_relative_links_point_to_existing_files(path):
         if not (path.parent / target.split("#")[0]).exists():
             broken.append(target)
     assert not broken, f"broken links: {broken}"
+
+
+def test_language_reference_lists_every_reserved_word():
+    from scribe_lang.semantics import RESERVED_WORDS
+
+    text = (ROOT / "docs" / "language.md").read_text(encoding="utf-8")
+    section = text.split("## Reserved words", 1)[1].split("\n## ", 1)[0]
+    missing = sorted(word for word in RESERVED_WORDS if f"`{word}`" not in section)
+    assert not missing, f"add to the reserved words in docs/language.md: {missing}"
