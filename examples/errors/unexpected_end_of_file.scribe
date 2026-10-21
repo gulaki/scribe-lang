@@ -1,0 +1,3 @@
+# The file stops in the middle of an expression.
+# expect: E0103 at 3:9
+x = (1 +

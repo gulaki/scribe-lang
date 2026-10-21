@@ -1,2 +1,2 @@
-# expect: unexpected
+# expect: E0101 at 2:4
 x =

@@ -1,4 +1,4 @@
-# expect: must be on the same line
+# expect: E0105 at 5:1
 if 1 > 0 {
     print 1
 }

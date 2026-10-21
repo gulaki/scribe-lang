@@ -1,2 +1,2 @@
-# expect: is a reserved word
+# expect: E0202 at 2:1
 else = 1

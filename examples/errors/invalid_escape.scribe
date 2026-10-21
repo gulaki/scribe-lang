@@ -1,0 +1,2 @@
+# expect: E0108 at 2:12
+print "tab:\q"

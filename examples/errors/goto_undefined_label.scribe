@@ -1,2 +1,2 @@
-# expect: undeclared label
+# expect: E0301 at 2:1
 goto nowhere

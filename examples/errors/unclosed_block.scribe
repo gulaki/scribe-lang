@@ -1,3 +1,3 @@
-# expect: never closed
+# expect: E0104 at 2:13
 while 1 > 0 {
     print 1

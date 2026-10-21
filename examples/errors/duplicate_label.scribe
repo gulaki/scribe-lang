@@ -1,4 +1,4 @@
-# expect: duplicate label
+# expect: E0302 at 4:1
 label top
 print 1
 label top
