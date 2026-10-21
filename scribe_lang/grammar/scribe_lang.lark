@@ -16,6 +16,7 @@ _sep: (_NL | ";")+
 ?statement: print_stmt
           | input_stmt
           | let_stmt
+          | multi_let_stmt
           | decl_stmt
           | if_stmt
           | while_stmt
@@ -26,7 +27,11 @@ _sep: (_NL | ";")+
 print_stmt: PRINT (STRING | expression)
 input_stmt: INPUT IDENT
 // `a = b = c = 0` is chained assignment: c = 0, then b = c, then a = b.
-let_stmt: (IDENT "=")+ expression
+// `a, b = x, y` evaluates every value, then assigns: `a, b = b, a` swaps.
+// Unequal counts (`a = 1, 2`, `a, b = 1`) parse, so semantics can explain
+// the mismatch.
+let_stmt: (IDENT "=")+ expression ("," expression)*
+multi_let_stmt: IDENT ("," IDENT)+ "=" expression ("," expression)*
 
 // `i64: a, b = 5, c` declares a, b and c, each zero unless given a value.
 decl_stmt: type_name ":" declarator ("," declarator)*

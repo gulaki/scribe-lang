@@ -84,6 +84,9 @@ CONSTANT_DIVISION_BY_ZERO = _register(
     "E0504", "constant-division-by-zero", "division by zero in a constant expression",
 )
 
+ASSIGNMENT_COUNT_MISMATCH = _register(
+    "E0601", "assignment-count-mismatch", "assignment has {targets} but {values}",
+)
 DUPLICATE_TARGET = _register(
     "E0602", "duplicate-assignment-target", "'{name}' is assigned more than once in one statement",
 )

@@ -5,7 +5,7 @@ from fractions import Fraction
 
 from .ast import (
     Binary, Block, Cast, ChainedLet, Comparison, Declaration, Expr, FloatLit,
-    Goto, Grouped, If, Input, IntLit, Label, Let, Print, Program,
+    Goto, Grouped, If, Input, IntLit, Label, Let, MultiLet, Print, Program,
     SourceLocation, Stmt, Unary, Variable, While,
 )
 from . import diagnostics as codes
@@ -134,6 +134,10 @@ def _fold(op: str, a: int, b: int) -> int | None:
     return quotient if (a < 0) == (b < 0) else -quotient
 
 
+def _count(n: int, noun: str) -> str:
+    return f"{n} {noun}{'' if n == 1 else 's'}"
+
+
 def _literal_text(expr: Expr) -> str | None:
     """The spelling of a (possibly signed or parenthesised) literal."""
     if isinstance(expr, IntLit):
@@ -224,6 +228,8 @@ class SemanticAnalyzer:
                 self._check_unique([(let.name, let.location) for let in reversed(stmt.lets)])
                 for let in stmt.lets:
                     self._let(let, scope)
+            elif isinstance(stmt, MultiLet):
+                self._multi_let(stmt, scope)
             elif isinstance(stmt, Declaration):
                 self._declaration(stmt, scope)
             elif isinstance(stmt, Input):
@@ -281,6 +287,20 @@ class SemanticAnalyzer:
     def _let(self, stmt: Let, scope: Scope) -> None:
         info = self._infer(stmt.value, scope)  # before declaring the target
         self._assign(stmt.name, scope, stmt.location, stmt.value, info)
+
+    def _multi_let(self, stmt: MultiLet, scope: Scope) -> None:
+        # Every value first, so none of them can see a target's new value
+        # (or a target that this statement declares).
+        infos = [self._infer(value, scope) for value in stmt.values]
+        if len(stmt.targets) != len(stmt.values):
+            self._diagnostics.error(
+                codes.ASSIGNMENT_COUNT_MISMATCH, stmt.location,
+                targets=_count(len(stmt.targets), "name"), values=_count(len(stmt.values), "value"),
+            )
+            return
+        self._check_unique(list(stmt.targets))
+        for (name, location), value, info in zip(stmt.targets, stmt.values, infos):
+            self._assign(name, scope, location, value, info)
 
     def _check_unique(self, targets: list[tuple[str, SourceLocation]]) -> None:
         """Report each target named again later in the same statement."""

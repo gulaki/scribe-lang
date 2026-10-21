@@ -9,8 +9,8 @@ from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedTok
 
 from .ast import (
     Binary, Block, Cast, ChainedLet, Comparison, Declaration, Declarator,
-    Elif, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let, Print,
-    Program, SourceLocation, Stmt, Unary, Variable, While,
+    Elif, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let, MultiLet,
+    Print, Program, SourceLocation, Stmt, Unary, Variable, While,
 )
 from . import diagnostics as codes
 from .diagnostics import Diagnostics, Span
@@ -59,7 +59,14 @@ class ASTBuilder(Transformer):
         return Input(str(items[1]), _loc(items[0]))
 
     def let_stmt(self, items):
-        *targets, value = items
+        targets = [item for item in items if isinstance(item, Token)]
+        values = [item for item in items if not isinstance(item, Token)]
+        if len(values) > 1:
+            # `a = 1, 2`, or `a = b = 1, 2`: the values all go to the last
+            # target, which semantics reports as a count mismatch.
+            last = (str(targets[-1]), _loc(targets[-1]))
+            return MultiLet((last,), tuple(values), last[1])
+        value = values[0]
         if len(targets) == 1:
             return Let(str(targets[0]), value, _loc(targets[0]))
         # Right to left: the last target gets the value, each earlier target
@@ -68,6 +75,11 @@ class ASTBuilder(Transformer):
         for target, source in zip(reversed(targets[:-1]), reversed(targets[1:])):
             lets.append(Let(str(target), Variable(str(source), _loc(source)), _loc(target)))
         return ChainedLet(tuple(lets), _loc(targets[0]))
+
+    def multi_let_stmt(self, items):
+        targets = tuple((str(item), _loc(item)) for item in items if isinstance(item, Token))
+        values = tuple(item for item in items if not isinstance(item, Token))
+        return MultiLet(targets, values, targets[0][1])
 
     def decl_stmt(self, items):
         type_token, *declarators = items

@@ -61,6 +61,16 @@ class ChainedLet(Stmt):
 
 
 @dataclass(frozen=True)
+class MultiLet(Stmt):
+    """`a, b = x, y`: every value is evaluated, left to right, before any
+    target is assigned. `targets` holds (name, location) pairs."""
+
+    targets: tuple[tuple[str, SourceLocation], ...]
+    values: tuple[Expr, ...]
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
 class Declarator(Node):
     """One `name` or `name = value` of a Declaration. Not a statement itself."""
 
@@ -195,4 +205,4 @@ class Cast(Expr):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
-StmtType = Union[Print, Input, Let, ChainedLet, Declaration, If, While, Block, Label, Goto]
+StmtType = Union[Print, Input, Let, ChainedLet, MultiLet, Declaration, If, While, Block, Label, Goto]

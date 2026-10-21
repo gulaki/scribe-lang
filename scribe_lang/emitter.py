@@ -5,8 +5,8 @@ from fractions import Fraction
 
 from .ast import (
     Binary, Block, Cast, ChainedLet, Comparison, Declaration, Expr, FloatLit,
-    Goto, Grouped, If, Input, Label, Let, Print, Program, SourceLocation,
-    Unary, Variable, While,
+    Goto, Grouped, If, Input, Label, Let, MultiLet, Print, Program,
+    SourceLocation, Unary, Variable, While,
 )
 from . import types
 from .semantics import Scope, SemanticModel
@@ -291,6 +291,21 @@ static float scribe_read_f32(void) {
 """, includes=["errno.h", "math.h", "stdlib.h"], needs=["scribe_read_token"]),
 }
 
+def _variables(expr: Expr):
+    """Names of the variables `expr` reads."""
+    if isinstance(expr, Variable):
+        yield expr.name
+    elif isinstance(expr, Grouped):
+        yield from _variables(expr.value)
+    elif isinstance(expr, Unary):
+        yield from _variables(expr.operand)
+    elif isinstance(expr, Cast):
+        yield from _variables(expr.operand)
+    elif isinstance(expr, (Binary, Comparison)):
+        yield from _variables(expr.left)
+        yield from _variables(expr.right)
+
+
 _CHECKED_I64 = {"+": "scribe_add_i64", "-": "scribe_sub_i64", "*": "scribe_mul_i64", "/": "scribe_div_i64"}
 _READ = {types.I64: "scribe_read_i64", types.F64: "scribe_read_f64", types.F32: "scribe_read_f32"}
 
@@ -323,6 +338,7 @@ class CEmitter:
     _includes: set[str] = field(default_factory=set, init=False)
     _helpers: set[str] = field(default_factory=set, init=False)
     _sites: list[str] = field(default_factory=list, init=False)
+    _temporaries: int = field(default=0, init=False)
 
     def emit_program(self, program: Program, model: SemanticModel) -> str:
         self._body = []
@@ -332,6 +348,7 @@ class CEmitter:
         self._includes = set()
         self._helpers = set()
         self._sites = []
+        self._temporaries = 0
 
         globals_ = [f"{self._c_type(symbol.type)} {c_variable(name)};" for name, symbol in sorted(model.root.symbols.items())]
 
@@ -422,6 +439,8 @@ class CEmitter:
         elif isinstance(stmt, ChainedLet):
             for let in stmt.lets:
                 self._stmt(let)
+        elif isinstance(stmt, MultiLet):
+            self._multi_let(stmt)
         elif isinstance(stmt, Declaration):
             # The variable itself is declared (and zeroed) at the top of its C
             # block. Assigning here as well means the declaration gives the
@@ -460,6 +479,32 @@ class CEmitter:
             self._line(f"goto {c_label(stmt.name)};")
         else:
             raise TypeError(f"Unsupported statement node: {type(stmt).__name__}")
+
+    def _multi_let(self, stmt: MultiLet) -> None:
+        """`a, b = x, y`. Plain assignments in order are enough unless a value
+        reads a target assigned before it; then every value is computed into
+        a temporary first (still left to right), in a C block of their own."""
+        names = [name for name, _ in stmt.targets]
+        types_ = [self._scopes[-1].lookup(name).type for name in names]
+        if not any(set(_variables(value)) & set(names[:i]) for i, value in enumerate(stmt.values)):
+            for name, type_, value in zip(names, types_, stmt.values):
+                self._line(f"{c_variable(name)} = {self._operand(value, type_)};")
+            return
+        self._line("{")
+        self._indent += 1
+        temporaries = []
+        for value in stmt.values:
+            self._temporaries += 1
+            temporary = f"t_{self._temporaries}"
+            value_type = self._model.type_of(value)
+            self._line(f"{self._c_type(value_type)} {temporary} = {self._expr(value)};")
+            temporaries.append((temporary, value_type))
+        for name, type_, (temporary, value_type) in zip(names, types_, temporaries):
+            # Only lossless widening reaches here, so a plain cast is exact.
+            value = temporary if value_type == type_ else f"(({self._c_type(type_)}){temporary})"
+            self._line(f"{c_variable(name)} = {value};")
+        self._indent -= 1
+        self._line("}")
 
     def _condition(self, cond: Comparison) -> str:
         # No outer parentheses: comparisons only appear as the condition of
