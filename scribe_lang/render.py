@@ -84,3 +84,33 @@ def render_text(diagnostics: Iterable[Diagnostic], source: str | None = None) ->
     if summary:
         out.append(summary)
     return "\n".join(out) + ("\n" if out else "")
+
+
+def _span_json(span: Span) -> dict:
+    return {
+        "file": span.filename,
+        "line": span.line,
+        "column": span.column,
+        "end_line": span.end_line,
+        "end_column": span.end_column,
+    }
+
+
+def diagnostic_to_dict(diag: Diagnostic) -> dict:
+    return {
+        "code": diag.code.code,
+        "name": diag.code.name,
+        "severity": diag.severity.value,
+        "message": diag.message,
+        "span": _span_json(diag.span),
+        "notes": [
+            {"message": note.message, "span": _span_json(note.span) if note.span else None}
+            for note in diag.notes
+        ],
+        "help": diag.help,
+    }
+
+
+def render_json(diagnostics: Iterable[Diagnostic]) -> str:
+    """A JSON array, one object per diagnostic, for editors and other tools."""
+    return json.dumps([diagnostic_to_dict(d) for d in diagnostics], indent=2) + "\n"

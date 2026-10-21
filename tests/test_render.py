@@ -1,7 +1,9 @@
 """Text and JSON rendering of diagnostics."""
 from scribe_lang import diagnostics as d
 from scribe_lang.ast import SourceLocation
-from scribe_lang.render import render_text
+import json
+
+from scribe_lang.render import render_json, render_text
 
 SOURCE = "x = 1\nprint total\n\tif\tfoo\n"
 
@@ -107,3 +109,27 @@ def test_summary_counts_errors_and_warnings():
 
 def test_nothing_to_report_renders_nothing():
     assert render_text(d.Diagnostics(), SOURCE) == ""
+
+
+def test_json_has_every_field():
+    diags = d.Diagnostics("prog.scribe")
+    diags.error(d.DUPLICATE_LABEL, loc(4, 1, 4, 10), name="top",
+                notes=(("first defined here", loc(2, 1, 2, 10)), ("plain", None)), help="rename one")
+    assert json.loads(render_json(diags)) == [{
+        "code": "E0302",
+        "name": "duplicate-label",
+        "severity": "error",
+        "message": "duplicate label 'top'",
+        "span": {"file": "prog.scribe", "line": 4, "column": 1, "end_line": 4, "end_column": 10},
+        "notes": [
+            {"message": "first defined here",
+             "span": {"file": "prog.scribe", "line": 2, "column": 1, "end_line": 2, "end_column": 10}},
+            {"message": "plain",
+             "span": {"file": "prog.scribe", "line": None, "column": None, "end_line": None, "end_column": None}},
+        ],
+        "help": "rename one",
+    }]
+
+
+def test_json_of_nothing_is_an_empty_list():
+    assert json.loads(render_json(d.Diagnostics())) == []
