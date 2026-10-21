@@ -1,4 +1,4 @@
-# expect: use of undeclared variable
+# expect: E0201 at 5:7
 {
     inner = 10
 }

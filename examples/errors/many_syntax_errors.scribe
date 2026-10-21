@@ -1,0 +1,18 @@
+# Every broken statement is reported, not just the first.
+# expect: E0101 at 8:5
+# expect: E0101 at 9:9
+# expect: E0102 at 10:7
+# expect: E0105 at 14:1
+# expect: E0202 at 17:1
+# expect: E0106 at 18:7
+x = 
+print 1 2
+y = 3 @ 4
+if 1 > 0 {
+    print "inside"
+}
+else {
+    print "else on its own line"
+}
+print = 5
+print "the end

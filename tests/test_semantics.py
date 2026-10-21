@@ -5,7 +5,8 @@ import pytest
 
 import scribe_lang
 from scribe_lang.ast import Block, Let, Number, Program
-from scribe_lang.errors import SemanticError
+from scribe_lang.diagnostics import Diagnostics
+from scribe_lang.parser import Parser
 from scribe_lang.semantics import RESERVED_WORDS, SemanticAnalyzer
 
 
@@ -14,9 +15,9 @@ def names(scope):
 
 
 def error_text(compiler, source):
-    with pytest.raises(SemanticError) as info:
-        compiler.compile(source)
-    return str(info.value)
+    result = compiler.compile(source)
+    assert not result.ok
+    return result.render()
 
 
 # -- scoping ----------------------------------------------------------------
@@ -39,7 +40,7 @@ def test_block_variable_is_not_visible_after_the_block(compiler):
     text = error_text(compiler, "if 1 > 0 {\n    y = 1\n}\nprint y\n")
     assert "undeclared variable 'y'" in text
     assert "block that ended" in text
-    assert "at 4:7" in text
+    assert ":4:7:" in text
 
 
 def test_use_before_first_assignment_in_a_block_is_rejected(compiler):
@@ -112,7 +113,7 @@ def test_identical_blocks_still_get_separate_scopes():
         return Block((Let("a", Number("1")),))
 
     first, second = make(), make()
-    model = SemanticAnalyzer().analyze(Program((first, second)))
+    model = SemanticAnalyzer().analyze(Program((first, second)), Diagnostics())
     assert len(model.scopes) == 2
     assert model.scopes[first] is not model.scopes[second]
     assert names(model.scopes[first]) == names(model.scopes[second]) == ["a"]
@@ -190,3 +191,74 @@ def test_reserved_words_match_the_keywords_in_the_grammar():
     grammar = Path(scribe_lang.__file__).parent / "grammar" / "scribe_lang.lark"
     keywords = set(re.findall(r'^[A-Z_]+:\s*"([a-z]+)"\s*$', grammar.read_text(), re.MULTILINE))
     assert keywords == set(RESERVED_WORDS)
+
+
+# -- collecting every error ---------------------------------------------------
+
+def analyze(source):
+    """(code, line, column) for every diagnostic, in the order reported."""
+    diags = Diagnostics("t.scribe")
+    SemanticAnalyzer().analyze(Parser().parse(source), diags)
+    return [(x.code.code, x.span.line, x.span.column) for x in diags]
+
+
+def test_every_semantic_error_is_reported_not_just_the_first():
+    source = "print a\nx = 99999999999999999999999999999999999999999\nlabel l\nlabel l\ngoto nowhere\nelse = 1\n"
+    assert analyze(source) == [
+        ("E0201", 1, 7), ("E0401", 2, 5), ("E0302", 4, 1), ("E0202", 6, 1), ("E0301", 5, 1),
+    ]
+
+
+def test_an_undeclared_variable_is_reported_once():
+    assert analyze("print y\nprint y + y\n{\n    print y\n}\n") == [("E0201", 1, 7)]
+
+
+def test_different_undeclared_variables_are_each_reported():
+    assert analyze("print a + b\nprint c\n") == [("E0201", 1, 7), ("E0201", 1, 11), ("E0201", 2, 7)]
+
+
+def test_a_reserved_name_does_not_also_report_undeclared_uses():
+    assert analyze("else = 1\nprint else\n") == [("E0202", 1, 1)]
+
+
+def test_every_goto_to_a_missing_label_is_reported():
+    assert analyze("goto a\ngoto a\n") == [("E0301", 1, 1), ("E0301", 2, 1)]
+
+
+def test_a_duplicate_label_does_not_hide_later_checks():
+    # The first definition wins, so the goto out of the block stays valid.
+    assert analyze("label top\n{\n    label top\n    goto top\n}\n") == [("E0302", 3, 5)]
+
+
+def notes(source):
+    diags = Diagnostics("t.scribe")
+    SemanticAnalyzer().analyze(Parser().parse(source), diags)
+    (diag,) = diags
+    return [(n.message, n.span.line, n.span.column) for n in diag.notes]
+
+
+def test_duplicate_label_points_at_the_first_definition():
+    assert notes("label top\nlabel top\n") == [("first defined here", 1, 1)]
+
+
+def test_goto_into_a_block_points_at_the_label():
+    assert notes("goto inside\n{\n    label inside\n}\n") == [
+        ("label 'inside' is defined here, inside a nested block", 3, 5),
+    ]
+
+
+def test_variable_from_an_ended_block_points_at_its_declaration():
+    assert notes("{\n    inner = 1\n}\nprint inner\n") == [
+        ("'inner' was declared here, in a block that ended", 2, 5),
+    ]
+
+
+def test_undeclared_variable_span_covers_the_name():
+    diags = Diagnostics("t.scribe")
+    SemanticAnalyzer().analyze(Parser().parse("print total\n"), diags)
+    (diag,) = diags
+    assert (diag.span.filename, diag.span.column, diag.span.end_column) == ("t.scribe", 7, 12)
+
+
+def test_a_clean_program_reports_nothing():
+    assert analyze("x = 1\nlabel a\nif x > 0 {\n    goto a\n}\n") == []

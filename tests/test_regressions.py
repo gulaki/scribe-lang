@@ -8,7 +8,8 @@ import pytest
 
 from scribe_lang.build import BUILD_SYSTEMS, BuildConfig
 from scribe_lang.cli import main
-from scribe_lang.errors import ParseError, SemanticError
+from scribe_lang.diagnostics import Diagnostics
+from scribe_lang.errors import ParseError
 from scribe_lang.parser import Parser
 
 
@@ -48,8 +49,9 @@ def test_number_literals_are_emitted_as_c_float_literals(compiler, literal, expe
 
 
 def test_literal_too_large_for_a_float_is_rejected(compiler):
-    with pytest.raises(SemanticError, match="too large"):
-        compiler.compile("x = " + "9" * 50 + "\n")
+    result = compiler.compile("x = " + "9" * 50 + "\n")
+    assert [d.code.code for d in result.diagnostics] == ["E0401"]
+    assert "too large" in result.diagnostics[0].message
 
 
 def test_largest_float_literal_is_accepted(compiler):
@@ -194,19 +196,19 @@ def test_grouped_expression_has_a_location():
 def test_parse_error_without_filename_reads_cleanly():
     with pytest.raises(ParseError) as info:
         Parser().parse("x = \n")
-    assert str(info.value).endswith(" at 1:5")
+    assert str(info.value).startswith("<input>:1:5: error[E0101]: ")
 
 
 def test_parse_error_with_filename():
-    with pytest.raises(ParseError) as info:
-        Parser().parse("x = \n", "f.scribe")
-    assert str(info.value).endswith(" at f.scribe:1:5")
+    diags = Diagnostics("f.scribe")
+    Parser().parse("x = \n", diags)
+    assert [(x.span.filename, x.span.line, x.span.column) for x in diags] == [("f.scribe", 1, 5)]
 
 
 def test_parse_error_at_end_of_input_names_it():
     with pytest.raises(ParseError) as info:
         Parser().parse("if 1 > 0 {")
-    assert "unexpected end of input" in str(info.value)
+    assert "missing '}'" in str(info.value)
     assert "$END" not in str(info.value)
 
 

@@ -23,6 +23,9 @@ The original compiler is deliberately educational: it has a hand-written lexer, 
                          │ SemanticAnalyzer   │
                          │ scopes / labels    │
                          └─────────┬──────────┘
+                                   │   every phase reports to a shared
+                                   │   Diagnostics collector; C is only
+                                   │   emitted when there are no errors
                                    │
                          ┌─────────┴──────────┐
                          ▼                    ▼
@@ -60,6 +63,10 @@ Variable, scope and label checks are not mixed into parsing or C generation. The
 ### 5. Build generation is separate from compilation
 
 Make/Ninja support is not tangled into code generation. More build systems can be added behind `BuildSystem`.
+
+### 6. Errors are data
+
+Phases never print or raise for mistakes in the program. They report `Diagnostic`s (stable code, span, notes, help) to a shared collector and keep going, so one run shows every error. `Compiler.compile()` returns a `CompilationResult` with the diagnostics, and `render.py` formats them as gcc-style text or JSON.
 
 ## Install
 
@@ -139,6 +146,21 @@ goto top
 
 **Build files** are written next to the C file by default, with paths relative to the build file's own directory. Run them from there: `make -C build` or `ninja -C build`.
 
+## Errors
+
+Every error in a file is reported in one run, in the style of gcc and clang:
+
+```text
+$ python -m scribe_lang.cli examples/errors/many_semantic_errors.scribe
+examples/errors/many_semantic_errors.scribe:9:7: error[E0201]: use of undeclared variable 'total'
+ 9 | print total
+   |       ^~~~~
+...
+7 errors generated.
+```
+
+Add `--diagnostics-format json` for machine-readable output. Codes, what they mean, and how to add new ones are in [`docs/errors.md`](docs/errors.md).
+
 ## Test
 
 ```bash
@@ -152,9 +174,9 @@ python -m pytest
 1. Add its syntax to `grammar/scribe_lang.lark`.
 2. Add an AST node to `scribe_lang/ast.py`.
 3. Add a Transformer method in `parser.py`.
-4. Add semantic checks in `semantics.py`.
+4. Add semantic checks in `semantics.py`, reporting errors with new codes (see [`docs/errors.md`](docs/errors.md#adding-an-error)).
 5. Add code generation in the backend(s).
-6. Add tests.
+6. Add tests, and an `examples/errors/` file for each new error code.
 
 For example, a future function syntax could be:
 

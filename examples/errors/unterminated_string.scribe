@@ -1,0 +1,2 @@
+# expect: E0106 at 2:7
+print "hello

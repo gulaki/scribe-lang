@@ -1,4 +1,4 @@
-# expect: jumps into a nested block
+# expect: E0303 at 2:1
 goto inside
 {
     label inside

@@ -31,6 +31,7 @@ def run_scribe(compiler, tmp_path):
 
     def run(source: str, stdin: str = "") -> str:
         result = compiler.compile(source)
+        assert result.ok, result.render()
         c_file = tmp_path / "prog.c"
         c_file.write_text(result.c_source, encoding="utf-8")
         exe = tmp_path / ("prog.exe" if os.name == "nt" else "prog")
