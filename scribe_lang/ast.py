@@ -6,10 +6,15 @@ from typing import Union
 
 @dataclass(frozen=True)
 class SourceLocation:
+    """Where a node came from. Lines and columns are 1-based; `end_column` and
+    `end_pos` point just past the last character."""
+
     line: int | None = None
     column: int | None = None
     start_pos: int | None = None
     end_pos: int | None = None
+    end_line: int | None = None
+    end_column: int | None = None
 
 
 class Node:

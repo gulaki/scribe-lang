@@ -164,3 +164,9 @@ def test_parse_error_reports_filename_line_and_column():
 def test_removed_keywords_are_ordinary_identifiers():
     program = parse("then = 1\nendif = 2\nrepeat = 3\nendwhile = 4\n")
     assert [stmt.name for stmt in program.statements] == ["then", "endif", "repeat", "endwhile"]
+
+
+def test_locations_record_where_a_token_ends():
+    stmt = parse("x = 1\nprint total\n").statements[1]
+    loc = stmt.value.location
+    assert (loc.line, loc.column, loc.end_line, loc.end_column) == (2, 7, 2, 12)

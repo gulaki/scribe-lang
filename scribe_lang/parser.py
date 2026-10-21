@@ -21,6 +21,8 @@ def _loc(item) -> SourceLocation:
         column=getattr(item, "column", None),
         start_pos=getattr(item, "start_pos", None),
         end_pos=getattr(item, "end_pos", None),
+        end_line=getattr(item, "end_line", None),
+        end_column=getattr(item, "end_column", None),
     )
 
 
