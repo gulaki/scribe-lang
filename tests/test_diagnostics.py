@@ -73,3 +73,11 @@ def test_collector_keeps_order_and_separates_warnings():
     assert diags.has_errors
     assert [x.code.code for x in diags] == ["W9999", "E0401", "E0301"]
     assert [x.code.code for x in diags.errors] == ["E0401", "E0301"]
+
+
+def test_every_code_is_documented():
+    from pathlib import Path
+
+    doc = (Path(__file__).resolve().parent.parent / "docs" / "errors.md").read_text(encoding="utf-8")
+    rows = set(re.findall(r"^\| (E\d{4}) \| ([a-z-]+) \|", doc, re.MULTILINE))
+    assert rows == {(code.code, code.name) for code in d.CODES.values()}
