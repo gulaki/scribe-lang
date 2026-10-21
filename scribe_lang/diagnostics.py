@@ -63,6 +63,7 @@ LEADING_ZERO = _register("E0109", "leading-zero", "leading zeros are not allowed
 
 UNDECLARED_VARIABLE = _register("E0201", "undeclared-variable", "use of undeclared variable '{name}'")
 RESERVED_NAME = _register("E0202", "reserved-name", "'{name}' is a reserved word and cannot be used as a {what} name")
+ALREADY_DECLARED = _register("E0203", "already-declared", "'{name}' is already declared")
 
 UNDECLARED_LABEL = _register("E0301", "undeclared-label", "goto to undeclared label '{name}'")
 DUPLICATE_LABEL = _register("E0302", "duplicate-label", "duplicate label '{name}'")

@@ -51,6 +51,24 @@ class Let(Stmt):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
+@dataclass(frozen=True)
+class Declarator(Node):
+    """One `name` or `name = value` of a Declaration. Not a statement itself."""
+
+    name: str
+    value: Expr | None = None
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class Declaration(Stmt):
+    """`i64: a, b = 5`: declares each name with the type `type_name`."""
+
+    type_name: str
+    declarators: tuple[Declarator, ...]
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
 # eq=False: a Block is compared and hashed by identity, never by value. Two
 # textually identical blocks are still two different scopes, and the semantic
 # model uses Block objects as dictionary keys.
@@ -168,4 +186,4 @@ class Cast(Expr):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
-StmtType = Union[Print, Input, Let, If, While, Block, Label, Goto]
+StmtType = Union[Print, Input, Let, Declaration, If, While, Block, Label, Goto]

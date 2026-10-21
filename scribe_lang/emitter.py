@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from .ast import (
-    Binary, Block, Cast, Comparison, Expr, FloatLit, Goto, Grouped, If, Input,
-    Label, Let, Print, Program, SourceLocation, Unary, Variable, While,
+    Binary, Block, Cast, Comparison, Declaration, Expr, FloatLit, Goto, Grouped,
+    If, Input, Label, Let, Print, Program, SourceLocation, Unary, Variable,
+    While,
 )
 from . import types
 from .semantics import Scope, SemanticModel
@@ -418,6 +419,17 @@ class CEmitter:
         elif isinstance(stmt, Let):
             symbol = self._scopes[-1].lookup(stmt.name)
             self._line(f"{c_variable(stmt.name)} = {self._operand(stmt.value, symbol.type)};")
+        elif isinstance(stmt, Declaration):
+            # The variable itself is declared (and zeroed) at the top of its C
+            # block. Assigning here as well means the declaration gives the
+            # variable its value every time it runs, even after a backward goto.
+            for declarator in stmt.declarators:
+                symbol = self._scopes[-1].lookup(declarator.name)
+                if declarator.value is None:
+                    value = self._zero(symbol.type)
+                else:
+                    value = self._operand(declarator.value, symbol.type)
+                self._line(f"{c_variable(declarator.name)} = {value};")
         elif isinstance(stmt, If):
             self._line(f"if ({self._condition(stmt.condition)}) {{")
             self._block_body(stmt.body)
@@ -454,6 +466,12 @@ class CEmitter:
         left = self._operand(cond.left, operand_type)
         right = self._operand(cond.right, operand_type)
         return f"{left} {cond.operator} {right}"
+
+    def _zero(self, t: ScalarType) -> str:
+        if t.is_float:
+            return c_float_literal(Fraction(0), t)
+        self._c_type(t)
+        return c_int_literal(0, t)
 
     def _operand(self, expr: Expr, t: ScalarType) -> str:
         """`expr` converted to `t`. Semantic analysis only allows lossless

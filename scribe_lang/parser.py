@@ -8,9 +8,9 @@ from lark import Lark, Transformer, Token
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 from .ast import (
-    Binary, Block, Cast, Comparison, Elif, FloatLit, Goto, Grouped, If, Input,
-    IntLit, Label, Let, Print, Program, SourceLocation, Stmt, Unary, Variable,
-    While,
+    Binary, Block, Cast, Comparison, Declaration, Declarator, Elif, FloatLit,
+    Goto, Grouped, If, Input, IntLit, Label, Let, Print, Program,
+    SourceLocation, Stmt, Unary, Variable, While,
 )
 from . import diagnostics as codes
 from .diagnostics import Diagnostics, Span
@@ -61,6 +61,14 @@ class ASTBuilder(Transformer):
     def let_stmt(self, items):
         return Let(str(items[0]), items[1], _loc(items[0]))
 
+    def decl_stmt(self, items):
+        type_token, *declarators = items
+        return Declaration(str(type_token), tuple(declarators), _loc(type_token))
+
+    def declarator(self, items):
+        name = items[0]
+        return Declarator(str(name), items[1] if len(items) > 1 else None, _loc(name))
+
     def if_stmt(self, items):
         # IF, comparison, Block, (ELIF, comparison, Block)*, (ELSE, Block)?
         if_token, condition, body, *rest = items
@@ -110,7 +118,7 @@ class ASTBuilder(Transformer):
         is_f32 = text.endswith("f")
         return FloatLit(text.removesuffix("f"), is_f32, _loc(items[0]))
 
-    def cast_type(self, items):
+    def type_name(self, items):
         return items[0]
 
     def cast(self, items):
@@ -287,6 +295,8 @@ _TERMINAL_WORDS = {
     "LPAR": "'('",
     "RPAR": "')'",
     "EQUAL": "'='",
+    "COLON": "':'",
+    "COMMA": "','",
     "COMP_OP": "a comparison operator",
     "ADD_OP": "an operator",
     "MUL_OP": "an operator",
@@ -296,7 +306,7 @@ _KEYWORDS = {"PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO", "
 
 # When every terminal of a group is expected, say the group's name instead.
 _GROUPS = [
-    ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE"}),
+    ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "I64", "F32", "F64"}),
     ("an expression", {"INT_LIT", "FLOAT_LIT", "IDENT", "LPAR", "SIGN", "I64", "F32", "F64"}),
 ]
 

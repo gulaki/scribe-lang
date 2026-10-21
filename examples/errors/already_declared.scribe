@@ -1,0 +1,9 @@
+# A declaration always makes a new variable, and Scribe has no shadowing, so
+# a name that is already visible cannot be declared again.
+# expect: E0203 at 6:6
+# expect: E0203 at 8:10
+total = 0
+i64: total
+{
+    f64: total
+}

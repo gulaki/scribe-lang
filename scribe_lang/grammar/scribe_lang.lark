@@ -16,6 +16,7 @@ _sep: (_NL | ";")+
 ?statement: print_stmt
           | input_stmt
           | let_stmt
+          | decl_stmt
           | if_stmt
           | while_stmt
           | block
@@ -25,6 +26,10 @@ _sep: (_NL | ";")+
 print_stmt: PRINT (STRING | expression)
 input_stmt: INPUT IDENT
 let_stmt: IDENT "=" expression
+
+// `i64: a, b = 5, c` declares a, b and c, each zero unless given a value.
+decl_stmt: type_name ":" declarator ("," declarator)*
+declarator: IDENT ("=" expression)?
 
 // `}` and the next `elif` / `else` must be on the same line (K&R style).
 if_stmt: IF comparison block (ELIF comparison block)* (ELSE block)?
@@ -46,11 +51,11 @@ comparison: expression COMP_OP expression
         | FLOAT_LIT     -> float_literal
         | IDENT         -> variable
         | "(" expression ")" -> grouped
-        | cast_type "(" expression ")" -> cast
+        | type_name "(" expression ")" -> cast
 
 // A cast is written like a call: `f64(n)`. Only these types can be named
-// today; see the reserved type names below.
-cast_type: I64 | F32 | F64
+// today (in casts and declarations); see the reserved type names below.
+type_name: I64 | F32 | F64
 
 ADD_OP: "+" | "-"
 MUL_OP: "*" | "/"

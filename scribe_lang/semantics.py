@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from .ast import (
-    Binary, Block, Cast, Comparison, Expr, FloatLit, Goto, Grouped, If, Input,
-    IntLit, Label, Let, Print, Program, SourceLocation, Stmt, Unary, Variable,
-    While,
+    Binary, Block, Cast, Comparison, Declaration, Expr, FloatLit, Goto,
+    Grouped, If, Input, IntLit, Label, Let, Print, Program, SourceLocation,
+    Stmt, Unary, Variable, While,
 )
 from . import diagnostics as codes
 from . import types
@@ -157,6 +157,9 @@ class SemanticAnalyzer:
     * `x = e` and `input x` assign to `x` if a variable called `x` is visible
       (declared earlier in this scope or an enclosing one). Otherwise they
       declare a new variable in the *innermost* scope.
+    * `i64: x = e` always declares `x` in the innermost scope; it is an error
+      if a variable called `x` is already visible (there is no shadowing).
+      Declarators are handled left to right, each value before its name.
     * The right-hand side is checked before the target is declared, so
       `x = x + 1` is an error when `x` does not exist yet.
     * `if` / `elif` / `while` conditions belong to the enclosing scope; each
@@ -217,6 +220,8 @@ class SemanticAnalyzer:
             if isinstance(stmt, Let):
                 info = self._infer(stmt.value, scope)  # before declaring the target
                 self._assign(stmt.name, scope, stmt.location, stmt.value, info)
+            elif isinstance(stmt, Declaration):
+                self._declaration(stmt, scope)
             elif isinstance(stmt, Input):
                 self._assign(stmt.name, scope, stmt.location, None, types.F64)
             elif isinstance(stmt, Print):
@@ -268,6 +273,23 @@ class SemanticAnalyzer:
             scope.declare(name, location, type_)
         elif value is not None and symbol.type is not None and info is not None:
             self._check_assignment(symbol, value, info)
+
+    def _declaration(self, stmt: Declaration, scope: Scope) -> None:
+        type_ = types.by_name(stmt.type_name)
+        for declarator in stmt.declarators:
+            info = None if declarator.value is None else self._infer(declarator.value, scope)
+            self._check_name(declarator.name, "variable", declarator.location)
+            existing = scope.lookup(declarator.name)
+            if existing is not None:
+                self._diagnostics.error(
+                    codes.ALREADY_DECLARED, declarator.location, name=declarator.name,
+                    notes=((f"'{declarator.name}' was declared here", existing.location),),
+                    help=f"Scribe has no shadowing: pick another name, or assign with '{declarator.name} = ...'",
+                )
+                continue
+            symbol = scope.declare(declarator.name, declarator.location, type_)
+            if declarator.value is not None and info is not None:
+                self._check_assignment(symbol, declarator.value, info)
 
     def _check_assignment(self, symbol: Symbol, value: Expr, info: _Info) -> None:
         target = symbol.type
