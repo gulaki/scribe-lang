@@ -8,7 +8,8 @@ from .ast import (
     Binary, Block, Comparison, Expr, Goto, Grouped, If, Input, Label, Let,
     Number, Print, Program, SourceLocation, Stmt, Unary, Variable, While,
 )
-from .errors import SemanticError
+from . import diagnostics as codes
+from .diagnostics import Diagnostics
 
 
 # Words the grammar treats as keywords. The contextual lexer only produces a
@@ -73,18 +74,13 @@ class SemanticModel:
     # label name -> scope the label was written in. C labels are function
     # scoped, so one namespace for the whole program.
     labels: dict[str, Scope] = field(default_factory=dict)
+    label_locations: dict[str, SourceLocation] = field(default_factory=dict)
     gotos: list[Goto] = field(default_factory=list)
 
     @property
     def symbols(self) -> dict[str, Symbol]:
         """Program-level (outermost scope) variables only."""
         return self.root.symbols
-
-
-def _where(location: SourceLocation) -> str:
-    if location.line is None:
-        return ""
-    return f" at {location.line}:{location.column}"
 
 
 class SemanticAnalyzer:
@@ -103,28 +99,32 @@ class SemanticAnalyzer:
     * Variables are not visible after the block that declared them ends.
     * Labels live in one program-wide namespace, but `goto` may only jump to a
       label in its own block or an enclosing block, never into a nested one.
+
+    Every problem is reported to `diagnostics` and analysis carries on, so all
+    errors are found in one run. To avoid a flood of follow-on errors, each
+    undeclared variable is reported only at its first use.
     """
 
-    def analyze(self, program: Program) -> SemanticModel:
+    def analyze(self, program: Program, diagnostics: Diagnostics) -> SemanticModel:
         model = SemanticModel()
         self._model = model
+        self._diagnostics = diagnostics
         self._goto_sites: list[tuple[Goto, Scope]] = []
         # Variables whose scope has already ended, for friendlier errors.
         self._closed: dict[str, SourceLocation] = {}
+        self._reported_undeclared: set[str] = set()
 
         self._visit_statements(program.statements, model.root)
 
         for goto, scope in self._goto_sites:
             label_scope = model.labels.get(goto.name)
             if label_scope is None:
-                raise SemanticError(
-                    f"GOTO to undeclared label '{goto.name}'{_where(goto.location)}"
-                )
-            if not label_scope.encloses(scope):
-                raise SemanticError(
-                    f"GOTO '{goto.name}'{_where(goto.location)} jumps into a "
-                    f"nested block; a goto may only jump within its own block "
-                    f"or out to an enclosing block"
+                diagnostics.error(codes.UNDECLARED_LABEL, goto.location, name=goto.name)
+            elif not label_scope.encloses(scope):
+                diagnostics.error(
+                    codes.GOTO_INTO_BLOCK, goto.location, name=goto.name,
+                    notes=((f"label '{goto.name}' is defined here, inside a nested block",
+                            model.label_locations[goto.name]),),
                 )
         return model
 
@@ -156,10 +156,14 @@ class SemanticAnalyzer:
             elif isinstance(stmt, Label):
                 self._check_name(stmt.name, "label", stmt.location)
                 if stmt.name in self._model.labels:
-                    raise SemanticError(
-                        f"duplicate label '{stmt.name}'{_where(stmt.location)}"
+                    # Keep the first definition; gotos are checked against it.
+                    self._diagnostics.error(
+                        codes.DUPLICATE_LABEL, stmt.location, name=stmt.name,
+                        notes=(("first defined here", self._model.label_locations[stmt.name]),),
                     )
-                self._model.labels[stmt.name] = scope
+                else:
+                    self._model.labels[stmt.name] = scope
+                    self._model.label_locations[stmt.name] = stmt.location
             elif isinstance(stmt, Goto):
                 self._model.gotos.append(stmt)
                 self._goto_sites.append((stmt, scope))
@@ -172,17 +176,15 @@ class SemanticAnalyzer:
             self._closed[name] = symbol.location
 
     def _assign(self, name: str, scope: Scope, location: SourceLocation) -> None:
+        # A reserved name is still declared, so its later uses do not also
+        # report "undeclared variable".
         self._check_name(name, "variable", location)
         if scope.lookup(name) is None:
             scope.declare(name, location)
 
-    @staticmethod
-    def _check_name(name: str, what: str, location: SourceLocation) -> None:
+    def _check_name(self, name: str, what: str, location: SourceLocation) -> None:
         if name in RESERVED_WORDS:
-            raise SemanticError(
-                f"'{name}' is a reserved word and cannot be used as a "
-                f"{what} name{_where(location)}"
-            )
+            self._diagnostics.error(codes.RESERVED_NAME, location, name=name, what=what)
 
     # -- expressions -------------------------------------------------------
 
@@ -192,19 +194,17 @@ class SemanticAnalyzer:
             # is an error here, not a C compiler warning later.
             (as_float,) = struct.unpack("f", struct.pack("f", float(expr.value)))
             if math.isinf(as_float):
-                raise SemanticError(
-                    f"number {expr.value} is too large for a float{_where(expr.location)}"
-                )
+                self._diagnostics.error(codes.NUMBER_TOO_LARGE, expr.location, value=expr.value)
         elif isinstance(expr, Variable):
-            if scope.lookup(expr.name) is None:
-                message = f"use of undeclared variable '{expr.name}'{_where(expr.location)}"
+            if scope.lookup(expr.name) is None and expr.name not in self._reported_undeclared:
+                self._reported_undeclared.add(expr.name)
                 gone = self._closed.get(expr.name)
+                notes = ()
                 if gone is not None:
-                    message += (
-                        f" ('{expr.name}' was declared in a block that ended; "
-                        f"first assigned at {gone.line}:{gone.column})"
-                    )
-                raise SemanticError(message)
+                    notes = ((f"'{expr.name}' was declared here, in a block that ended", gone),)
+                self._diagnostics.error(
+                    codes.UNDECLARED_VARIABLE, expr.location, name=expr.name, notes=notes,
+                )
         elif isinstance(expr, Grouped):
             self._expr(expr.value, scope)
         elif isinstance(expr, Unary):
