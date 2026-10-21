@@ -1,0 +1,4 @@
+# A decimal number cannot start with 0: in C, 017 would be octal 15.
+# Write 17, or 0o17 for octal.
+# expect: E0109 at 4:11
+minutes = 017

@@ -1,6 +1,6 @@
 # Scribe: a safe, readable front end for C
 
-*Design whitepaper, draft 1. Status: proposal. Today's language (v0.1) is float-only; everything beyond that is a design target.*
+*Design whitepaper, draft 2. The language today has the scalar types i64, f64 and f32, declarations, chained and multiple assignment, blocks, `if`/`while` and `goto`; [`language.md`](language.md) describes it. Everything else here is a design target.*
 
 ## 1. Thesis
 
@@ -16,15 +16,15 @@ Each point is stated, then judged: what holds, where the risks are and what we r
 **Agree, and this is the right organising principle.** Two consequences:
 
 - The guarantee must be *enumerable*. We keep a catalogue of C's undefined behaviours and, for each, the mechanism that rules it out (compile-time rejection, a checked runtime operation, or a construct that cannot be expressed). See [`ub-catalogue.md`](design/ub-catalogue.md). Every new feature must update that table before it ships.
-- Rejecting is not enough; **the runtime behaviour on violation must also be defined**. Policy: a violated check (overflow, bounds, division by zero, failed `require`) *traps*: it prints a located message and exits with a distinct status. No silent wraparound, no exceptions in v1.
-- Defence in depth: the whole test suite builds generated C with `-fsanitize=undefined,address` and strict warnings. The guarantee is only as good as the emitter and the hand-written runtime, so both are tested adversarially.
+- Rejecting is not enough; **the runtime behaviour on violation must also be defined**. Policy: a violated check (overflow, bounds, division by zero, failed `require`) *traps*: it prints a located message and stops the program (`abort()`, so a nonzero exit status). No silent wraparound, no exceptions in v1. This is how integer overflow, integer division by zero and out-of-range float-to-integer casts behave today.
+- Defence in depth: every program the test suite generates is built with `-std=c11 -pedantic-errors -Wall -Wextra`. The runtime-error tests always build with UBSan, so a check that fires too late shows up as a sanitizer report, and `SCRIBE_SANITIZE=1` builds every run with UBSan. AddressSanitizer joins once there is heap memory to check. The guarantee is only as good as the emitter and the hand-written runtime, so both are tested adversarially.
 - AI-friendliness is a design input: one obvious way to do each thing, locally checkable rules, diagnostics precise enough to feed back into a model.
-- `goto` already exists in v0.1. It interacts with cleanup (jumping out of a scope must run destructors). Keep it function-local and lower it so cleanups run on every exit edge; revisit whether it survives past v0.5.
+- `goto` exists today. It interacts with cleanup (jumping out of a scope must run destructors). Keep it function-local and lower it so cleanups run on every exit edge; revisit whether it survives past v0.5.
 
 ### 2.2 Explicit typing first, a little inference later
-**Agree.** Keep inference *local and one-directional*: a declaration's type comes from its own right-hand side (literal, constructor call, function return type) and never from later uses. No unification, no inference across statements. Rules: `x := 3` is `int`, `x := 3.0` is `float`, `x := Account(...)` is `Account`; everything else needs an annotation.
+**Agree, and implemented for scalars.** Inference is *local and one-directional*: a variable's type comes from its first assignment (a literal, a cast, later a constructor call or a function's return type) and never from later uses. No unification, no inference across statements. `x = 3` is an `i64`, `x = 3.0` an `f64`, `x = 2.5f` an `f32`; later, `a = Account(...)` will be an `Account`. Everything else is declared: `i64: x, y = 5`.
 
-**Risk: compatibility.** In v0.1 `7` is a float and every variable is untyped. In a typed language `7` is an int. We need an explicit edition marker (`#! scribe 0.1` vs `0.2`), with v0.1 as a legacy mode in which the old rules hold, rather than a silent reinterpretation. Numeric rules: no implicit narrowing; implicit `int -> float` widening only where lossless, otherwise explicit `float(n)`; checked arithmetic by default, wrapping only through visible operators (`+%`).
+**Compatibility (decided).** In v0.1 `7` was a float; now it is an i64. Rather than an edition marker with a legacy float-only mode, the language made the breaking change before 1.0 and the examples were migrated. Numeric rules (implemented): no implicit conversion that could lose a value; implicit widening only where every value converts exactly (`f32` to `f64`); everything else through a cast written like a call, `f64(n)` or `i64(x)`; checked arithmetic by default. Wrapping arithmetic will only be available through visible operators (`+%`, planned). The full rules are in [`type-system.md`](design/type-system.md).
 
 ### 2.3 Typed functions with unions and overloading
 **Agree with caution: this is the riskiest combination.** Unions plus overloading plus implicit widening produces ambiguity quickly. Proposal:
@@ -44,12 +44,12 @@ Each point is stated, then judged: what holds, where the risks are and what we r
 Text-level C templating (macros or string substitution) is cheap to start with but has no hygiene. We use a structured template format (placeholders for type, name and size only, checked at build time) instead of freeform macros. See [`lowering.md`](design/lowering.md).
 
 ### 2.5 Generated names, towards lowered monomorphised code
-**Agree; v0.1 already started.** Variables become `v_x` and labels `l_x` so no Scribe name can clash with a C keyword or libc symbol. Extend to a scheme that is deterministic, readable and collision-free: `module__fn__sig` for functions, `Type__method`, `Array__int__push`, `_1` suffixes for shadowing. Emit `#line` directives so debuggers and C diagnostics point back to Scribe source. Hash suffixes only as a last resort; readable output is part of the product.
+**Agree, and started.** Variables become `v_x`, labels `l_x`, temporaries `t_1` and runtime helpers `scribe_*`, so no Scribe name can clash with a C keyword or libc symbol. Scribe has no shadowing, so a name never needs a suffix. Extend to a scheme that is deterministic, readable and collision-free: `module__fn__sig` for functions, `Type__method`, `Array__i64__push`. Emit `#line` directives so debuggers and C diagnostics point back to Scribe source. Hash suffixes only as a last resort; readable output is part of the product.
 
 ### 2.6 No visible pointers; RAII with escape analysis; maybe ref counting later
 **Agree on the goal. The key design decision is what replaces lifetimes.** Rust solves this with lifetime annotations; Scribe should not. Recommendation, based on mutable value semantics (Hylo, Swift-style `inout`):
 
-- Aggregates (`struct`, `Array`, `string`) have **value semantics**: assignment is a (possibly lazy) copy or a move; no two live names alias the same mutable data.
+- Aggregates (`struct`, `Array`, `str`) have **value semantics**: assignment is a (possibly lazy) copy or a move; no two live names alias the same mutable data.
 - Function parameters are **borrowed by default** (read-only; `mut` for exclusive write access; `take` to move ownership in). Borrows are **second-class**: they may be passed down, but not stored in a field, captured, or returned. That single rule removes dangling references with no lifetime syntax.
 - Exclusive access is checked: you cannot mutate a collection while an iterator borrows it. This kills iterator invalidation.
 - Heap placement is **inferred**: values that don't escape live on the stack; escaping values get a unique owner and a compiler-inserted free on every exit path (including early `return`, `goto` and traps-that-clean-up).
@@ -65,14 +65,14 @@ source -> parse -> AST -> semantic analysis (scopes, types, ownership)
        -> C AST -> C text (+ #line)  -> cc
 ```
 
-Today the pipeline is `parse -> AST -> semantics -> C text`. The step to add first is a **typed IR** between semantics and emission, so that lowering decisions (checked ops, cleanup, naming) are made once, in one place, instead of inside string-building code.
+Today the pipeline is `parse -> AST -> semantics (scopes and types) -> C text`. Checked arithmetic did not need more: the emitter picks a small checked C helper from each expression's type. A **typed IR** between semantics and emission becomes necessary with functions and ownership, where lowering decisions (cleanups on every exit edge, moves, monomorphisation) must be made once, in one place, instead of inside string-building code.
 
 ## 4. Roadmap
 
 | Version | Adds | Safety work |
 |---|---|---|
-| 0.1 (now) | float-only, blocks, `goto`, strings in `print` | float literals, `puts`, name prefixes |
-| 0.2 | `int`, `bool`, `float`, annotations, `:=`, editions | checked arithmetic, trap runtime, UBSan CI |
+| 0.1 (done) | float-only, blocks, `goto`, strings in `print` | float literals, `puts`, name prefixes |
+| 0.2 (in progress) | done: `i64`, `f64`, `f32`, Python-style literals, declarations, chained and multiple assignment, casts. Next: `bool` and conditions as expressions, sized integers, `**`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
 | 0.3 | functions, recursion, `return` | missing-return analysis, stack-depth policy |
 | 0.4 | arrays, strings, `for`, runtime templates | bounds checks, allocation-failure policy |
 | 0.5 | `struct`, value semantics, borrow rules | exclusive access, move checking |
@@ -85,10 +85,10 @@ Order rationale: types before functions (signatures need them), arrays before st
 
 ## 5. Open questions
 
-1. **Trap vs. exceptions vs. `Result`.** Traps for contract violations; ordinary failures (parse, I/O) via `T | Error` unions. Is that enough?
+1. **Trap vs. exceptions vs. `Result`.** Traps for contract violations; ordinary failures (parse, I/O) via `T | Error` unions. Is that enough? Deliberately left open until functions are designed; trapping on overflow works with either answer.
 2. **Stack overflow.** Options: a depth counter in recursive functions, static call-graph bounds, or document as a limit. Probably the counter.
-3. **Integer width.** One `int` (64-bit) or sized types too (`i8`..`u64`)? Sized types matter for C interop and arrays; propose `int` plus sized types later.
-4. **Floats.** Keep `float` as binary32 (as now) or default to `double`? Binary32 is surprising for new users; revisit at 0.2.
+3. **Integer width.** Decided: sized types (`i8` ... `u64`), with i64 as the default for integer literals. i64 is implemented; the rest are next.
+4. **Floats.** Decided: `f32` and `f64`, with f64 the default for float literals (`2.5f` is f32).
 5. **C interop.** An `extern` mechanism is where pointers sneak back in. Proposal: a vetted, audited binding layer, not user-written.
 6. **Concurrency.** Out of scope until the ownership model is settled; data races are UB we simply do not offer yet.
 7. **Strings.** UTF-8 bytes with validated construction; indexing by byte or by code point?

@@ -1,16 +1,16 @@
 # PROPOSAL (v0.3): explicitly typed functions, recursion, early return.
 # Not supported yet. See docs/design/type-system.md and lowering.md.
 
-fn gcd(a: int, b: int) -> int {
+fn gcd(a: i64, b: i64) -> i64 {
     while b != 0 {
-        a, b = b, a % b       # `%` exists once `int` does; division by 0 traps
+        a, b = b, a % b       # `%` is planned; division by zero traps
     }
     return a
 }
 
-fn is_prime(n: int) -> bool {
+fn is_prime(n: i64) -> bool {
     if n < 2 { return false }
-    d: int = 2
+    i64: d = 2
     while d * d <= n {
         if n % d == 0 { return false }
         d = d + 1
@@ -18,7 +18,7 @@ fn is_prime(n: int) -> bool {
     return true
 }
 
-fn fact(n: int) -> int {      # checked arithmetic traps on overflow at n = 21
+fn fact(n: i64) -> i64 {      # checked arithmetic traps on overflow at n = 21
     if n <= 1 { return 1 }
     return n * fact(n - 1)
 }

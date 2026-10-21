@@ -8,8 +8,9 @@ from lark import Lark, Transformer, Token
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 from .ast import (
-    Binary, Block, Comparison, Elif, Goto, Grouped, If, Input, Label, Let,
-    Number, Print, Program, SourceLocation, Stmt, Unary, Variable, While,
+    Binary, Block, Cast, ChainedLet, Comparison, Declaration, Declarator,
+    Elif, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let, MultiLet,
+    Print, Program, SourceLocation, Stmt, Unary, Variable, While,
 )
 from . import diagnostics as codes
 from .diagnostics import Diagnostics, Span
@@ -58,7 +59,35 @@ class ASTBuilder(Transformer):
         return Input(str(items[1]), _loc(items[0]))
 
     def let_stmt(self, items):
-        return Let(str(items[0]), items[1], _loc(items[0]))
+        targets = [item for item in items if isinstance(item, Token)]
+        values = [item for item in items if not isinstance(item, Token)]
+        if len(values) > 1:
+            # `a = 1, 2`, or `a = b = 1, 2`: the values all go to the last
+            # target, which semantics reports as a count mismatch.
+            last = (str(targets[-1]), _loc(targets[-1]))
+            return MultiLet((last,), tuple(values), last[1])
+        value = values[0]
+        if len(targets) == 1:
+            return Let(str(targets[0]), value, _loc(targets[0]))
+        # Right to left: the last target gets the value, each earlier target
+        # gets the one to its right.
+        lets = [Let(str(targets[-1]), value, _loc(targets[-1]))]
+        for target, source in zip(reversed(targets[:-1]), reversed(targets[1:])):
+            lets.append(Let(str(target), Variable(str(source), _loc(source)), _loc(target)))
+        return ChainedLet(tuple(lets), _loc(targets[0]))
+
+    def multi_let_stmt(self, items):
+        targets = tuple((str(item), _loc(item)) for item in items if isinstance(item, Token))
+        values = tuple(item for item in items if not isinstance(item, Token))
+        return MultiLet(targets, values, targets[0][1])
+
+    def decl_stmt(self, items):
+        type_token, *declarators = items
+        return Declaration(str(type_token), tuple(declarators), _loc(type_token))
+
+    def declarator(self, items):
+        name = items[0]
+        return Declarator(str(name), items[1] if len(items) > 1 else None, _loc(name))
 
     def if_stmt(self, items):
         # IF, comparison, Block, (ELIF, comparison, Block)*, (ELSE, Block)?
@@ -100,8 +129,21 @@ class ASTBuilder(Transformer):
             return items[0]
         return Unary(str(items[0]), items[1], _loc(items[0]))
 
-    def number(self, items):
-        return Number(str(items[0]), _loc(items[0]))
+    def int_literal(self, items):
+        text = str(items[0])
+        return IntLit(int(text, 0), text, _loc(items[0]))
+
+    def float_literal(self, items):
+        text = str(items[0]).replace("_", "")
+        is_f32 = text.endswith("f")
+        return FloatLit(text.removesuffix("f"), is_f32, _loc(items[0]))
+
+    def type_name(self, items):
+        return items[0]
+
+    def cast(self, items):
+        type_token, operand = items
+        return Cast(str(type_token), operand, _loc(type_token))
 
     def variable(self, items):
         return Variable(str(items[0]), _loc(items[0]))
@@ -126,9 +168,9 @@ def _fold_binary(items):
         return items[0]
     node = items[0]
     for i in range(1, len(items), 2):
-        op = str(items[i])
+        op = items[i]
         rhs = items[i + 1]
-        node = Binary(node, op, rhs, getattr(node, "location", SourceLocation()))
+        node = Binary(node, str(op), rhs, getattr(node, "location", SourceLocation()), _loc(op))
     return node
 
 
@@ -265,24 +307,27 @@ _TERMINAL_WORDS = {
     "SEMICOLON": "';'",
     "$END": "end of file",
     "IDENT": "a name",
-    "NUMBER": "a number",
+    "INT_LIT": "a number",
+    "FLOAT_LIT": "a number",
     "STRING": "a string",
     "LBRACE": "'{'",
     "RBRACE": "'}'",
     "LPAR": "'('",
     "RPAR": "')'",
     "EQUAL": "'='",
+    "COLON": "':'",
+    "COMMA": "','",
     "COMP_OP": "a comparison operator",
     "ADD_OP": "an operator",
     "MUL_OP": "an operator",
     "SIGN": "'+' or '-'",
 }
-_KEYWORDS = {"PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO"}
+_KEYWORDS = {"PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO", "I64", "F32", "F64"}
 
 # When every terminal of a group is expected, say the group's name instead.
 _GROUPS = [
-    ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE"}),
-    ("an expression", {"NUMBER", "IDENT", "LPAR", "SIGN"}),
+    ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "I64", "F32", "F64"}),
+    ("an expression", {"INT_LIT", "FLOAT_LIT", "IDENT", "LPAR", "SIGN", "I64", "F32", "F64"}),
 ]
 
 
@@ -293,7 +338,7 @@ def _terminal_word(name: str) -> str:
 
 
 def describe_expected(expected: set[str]) -> str:
-    """`{'IDENT', 'NUMBER', 'LPAR', 'SIGN'}` -> "an expression"."""
+    """`{'IDENT', 'INT_LIT', 'LPAR', ...}` -> "an expression"."""
     remaining = set(expected)
     words: list[str] = []
     for word, group in _GROUPS:
@@ -315,7 +360,7 @@ def describe_expected(expected: set[str]) -> str:
 def describe_token(token: Token) -> str:
     if token.type == "IDENT":
         return f"name '{token}'"
-    if token.type == "NUMBER":
+    if token.type in ("INT_LIT", "FLOAT_LIT"):
         return f"number {token}"
     if token.type == "STRING":
         return f"string {token}"
@@ -478,12 +523,34 @@ def _hint_bad_string(err: _SyntaxError) -> bool:
     return False
 
 
+_LEADING_ZERO = re.compile(r"0[0-9_]*[0-9]")
+
+
+def _hint_leading_zero(err: _SyntaxError) -> bool:
+    # `017` matches no terminal: in C it would be octal 15, in Python it is
+    # an error, and Scribe follows Python.
+    if not isinstance(err.exc, UnexpectedCharacters) or err.exc.char != "0":
+        return False
+    pos = err.exc.pos_in_stream
+    match = _LEADING_ZERO.match(err.text, pos)
+    if match is None or (pos > 0 and (err.text[pos - 1].isalnum() or err.text[pos - 1] in "_.")):
+        return False
+    digits = match.group()
+    decimal = digits.lstrip("0_") or "0"
+    help = f"write {decimal} for a decimal number"
+    if set(decimal) <= set("01234567_"):
+        help += f", or 0o{decimal} for an octal one"
+    err.diagnostics.error(codes.LEADING_ZERO, err.span_at(pos, len(digits)), number=digits, help=help)
+    return True
+
+
 _HINTS = [
     _hint_misplaced_else,
     _hint_reserved_word_assignment,
     _hint_unclosed_block,
     _hint_unmatched_closing_brace,
     _hint_bad_string,
+    _hint_leading_zero,
 ]
 
 

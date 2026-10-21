@@ -69,7 +69,7 @@ class Compiler:
         model = self.semantic.analyze(ast, diagnostics)
         if diagnostics.has_errors:
             return result(ast=ast, semantic_model=model)
-        c_source = CEmitter().emit_program(ast, model)
+        c_source = CEmitter(filename=filename).emit_program(ast, model)
         return result(ast=ast, semantic_model=model, c_source=c_source)
 
     def write_c(self, source: str, output: str | Path, filename: str | None = None) -> CompilationResult:

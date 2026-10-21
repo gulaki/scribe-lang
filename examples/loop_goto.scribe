@@ -1,5 +1,6 @@
 i = 1
 print "Enter number: "
+i64: N
 input N
 label loop
     print i

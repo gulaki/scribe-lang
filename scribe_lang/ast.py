@@ -51,6 +51,43 @@ class Let(Stmt):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
+@dataclass(frozen=True)
+class ChainedLet(Stmt):
+    """`a = b = c = e`, kept as the assignments it means, in order:
+    `c = e`, `b = c`, `a = b`. The value is computed once."""
+
+    lets: tuple[Let, ...]
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class MultiLet(Stmt):
+    """`a, b = x, y`: every value is evaluated, left to right, before any
+    target is assigned. `targets` holds (name, location) pairs."""
+
+    targets: tuple[tuple[str, SourceLocation], ...]
+    values: tuple[Expr, ...]
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class Declarator(Node):
+    """One `name` or `name = value` of a Declaration. Not a statement itself."""
+
+    name: str
+    value: Expr | None = None
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class Declaration(Stmt):
+    """`i64: a, b = 5`: declares each name with the type `type_name`."""
+
+    type_name: str
+    declarators: tuple[Declarator, ...]
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
 # eq=False: a Block is compared and hashed by identity, never by value. Two
 # textually identical blocks are still two different scopes, and the semantic
 # model uses Block objects as dictionary keys.
@@ -104,8 +141,21 @@ class Expr(Node):
 
 
 @dataclass(frozen=True)
-class Number(Expr):
-    value: str
+class IntLit(Expr):
+    """An integer literal. `text` is the spelling, for messages."""
+
+    value: int
+    text: str = ""
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class FloatLit(Expr):
+    """A float literal. `text` is the spelling without `_` or the `f` suffix;
+    `is_f32` is True when it had the suffix (`2.5f`)."""
+
+    text: str
+    is_f32: bool = False
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
@@ -134,6 +184,8 @@ class Binary(Expr):
     operator: str
     right: Expr
     location: SourceLocation = field(default_factory=SourceLocation)
+    # Where the operator is, for type errors and runtime error messages.
+    operator_location: SourceLocation = field(default_factory=SourceLocation, compare=False)
 
 
 @dataclass(frozen=True)
@@ -144,4 +196,13 @@ class Comparison(Expr):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
-StmtType = Union[Print, Input, Let, If, While, Block, Label, Goto]
+@dataclass(frozen=True)
+class Cast(Expr):
+    """`f64(x)`: converts `operand` to the type called `type_name`."""
+
+    type_name: str
+    operand: Expr
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+StmtType = Union[Print, Input, Let, ChainedLet, MultiLet, Declaration, If, While, Block, Label, Goto]

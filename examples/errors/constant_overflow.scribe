@@ -1,0 +1,3 @@
+# Constant expressions are computed exactly; the result must fit its type.
+# expect: E0503 at 3:7
+big = 9223372036854775807 + 1

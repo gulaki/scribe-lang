@@ -8,31 +8,17 @@ examples/future/  proposals for later versions. They must NOT compile today:
                   if one starts compiling, move it out of future/ and record
                   its run in test_end_to_end.py.
 """
-import re
-
 import pytest
 
 from scribe_lang import diagnostics
 
-from conftest import EXAMPLES
+from conftest import EXAMPLES, expected_diagnostics
 
 ERROR_EXAMPLES = sorted((EXAMPLES / "errors").glob("*.scribe"))
 FUTURE_EXAMPLES = sorted((EXAMPLES / "future").rglob("*.scribe"))
 
-EXPECT = re.compile(r"# expect: (?P<code>[EW]\d{4}) at (?P<line>\d+):(?P<column>\d+)$")
-
 # Codes that no source file can trigger: they come from the driver.
 NOT_FROM_SOURCE = {diagnostics.INTERNAL_ERROR.code, diagnostics.CANNOT_READ_SOURCE.code}
-
-
-def expected_diagnostics(source):
-    found = []
-    for line in source.splitlines():
-        if line.startswith("# expect:"):
-            match = EXPECT.match(line)
-            assert match, f"malformed expectation: {line!r}"
-            found.append((match["code"], int(match["line"]), int(match["column"])))
-    return found
 
 
 @pytest.mark.parametrize("path", ERROR_EXAMPLES, ids=lambda p: p.stem)

@@ -1,0 +1,5 @@
+# A multiple assignment needs one value per name.
+# expect: E0601 at 4:1
+# expect: E0601 at 5:1
+low, high = 0
+total = 1, 2

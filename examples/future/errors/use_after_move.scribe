@@ -1,7 +1,7 @@
 # PROPOSAL: ownership. Passing a heap object by `take` moves it.
-#   error: `a` was moved at line 7 and cannot be used here
+#   error: `a` was moved at line 6 and cannot be used here
 fn consume(take a: Account) { print a.describe() }
 
-a := Account(1, "x")
+a = Account(1, "x")
 consume(a)
 print a.balance

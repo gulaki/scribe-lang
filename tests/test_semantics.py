@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 import scribe_lang
-from scribe_lang.ast import Block, Let, Number, Program
+from scribe_lang.ast import Block, IntLit, Let, Program
 from scribe_lang.diagnostics import Diagnostics
 from scribe_lang.parser import Parser
 from scribe_lang.semantics import RESERVED_WORDS, SemanticAnalyzer
@@ -110,7 +110,7 @@ def test_identical_blocks_still_get_separate_scopes():
     # Hand-built AST with two indistinguishable blocks (same contents, default
     # locations). If Block compared by value they would share one scope entry.
     def make():
-        return Block((Let("a", Number("1")),))
+        return Block((Let("a", IntLit(1, "1")),))
 
     first, second = make(), make()
     model = SemanticAnalyzer().analyze(Program((first, second)), Diagnostics())
@@ -189,7 +189,7 @@ def test_keyword_as_a_label_name_is_rejected(compiler, word):
 
 def test_reserved_words_match_the_keywords_in_the_grammar():
     grammar = Path(scribe_lang.__file__).parent / "grammar" / "scribe_lang.lark"
-    keywords = set(re.findall(r'^[A-Z_]+:\s*"([a-z]+)"\s*$', grammar.read_text(), re.MULTILINE))
+    keywords = set(re.findall(r'^[A-Z0-9_]+:\s*"([a-z0-9]+)"\s*$', grammar.read_text(), re.MULTILINE))
     assert keywords == set(RESERVED_WORDS)
 
 

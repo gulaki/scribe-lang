@@ -4,7 +4,7 @@ Goal: no pointers in the language, no lifetimes in the syntax, no leaks, no use-
 
 ## 1. Value semantics
 
-`struct`, `Array`, `string` behave like values. `b = a` means `b` is independent of `a`. The compiler implements this with a move when `a` is dead afterwards (decided by last-use analysis) and a copy otherwise (optionally copy-on-write for large arrays). Programmers can reason locally: mutation through one name never shows up under another.
+`struct`, `Array` and `str` behave like values. `b = a` means `b` is independent of `a`. The compiler implements this with a move when `a` is dead afterwards (decided by last-use analysis) and a copy otherwise (optionally copy-on-write for large arrays). Programmers can reason locally: mutation through one name never shows up under another.
 
 ## 2. Parameter modes
 

@@ -1,9 +1,9 @@
 print "Enter number to calculate factorial:"
+i64: num               # declared i64, so `input` reads a whole number
 input num
 print ""
 
-i = 1
-fact = 1
+i = fact = 1           # chained assignment: both i64
 
 while i <= num {
     fact = fact * i

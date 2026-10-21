@@ -1,7 +1,7 @@
 # PROPOSAL: unions must be matched completely.
-#   error: match on `int | float` does not cover `float`
-fn f(n: int | float) -> int {
+#   error: match on `i64 | f64` does not cover `f64`
+fn f(n: i64 | f64) -> i64 {
     match n {
-        int i => return i
+        i64 i => return i
     }
 }

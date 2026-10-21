@@ -1,14 +1,11 @@
 print "How many fibonacci numbers do you want?"
+i64: nums
 input nums
 print ""
 
-a = 0
-b = 1
-
+a, b = 0, 1
 while nums > 0 {
     print a
-    c = a + b      # first assigned inside the loop body, so local to it
-    a = b
-    b = c
+    a, b = b, a + b    # both values are read first, then assigned
     nums = nums - 1
 }

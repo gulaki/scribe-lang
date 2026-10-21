@@ -46,7 +46,8 @@ def _register(code: str, name: str, template: str, severity: Severity = Severity
 
 # Codes are grouped by hundreds and never reused or renumbered once released.
 #   E00xx  driver and internal   E01xx  syntax       E02xx  names and scopes
-#   E03xx  labels and goto       E04xx  literals
+#   E03xx  labels and goto       E04xx  literals     E05xx  types
+#   E06xx  assignments
 
 INTERNAL_ERROR = _register("E0001", "internal-error", "internal compiler error: {detail}")
 CANNOT_READ_SOURCE = _register("E0002", "cannot-read-source", "cannot read {path}: {reason}")
@@ -59,9 +60,11 @@ MISPLACED_ELSE = _register("E0105", "misplaced-else", "'{word}' must be on the s
 UNTERMINATED_STRING = _register("E0106", "unterminated-string", "unterminated string")
 UNMATCHED_CLOSING_BRACE = _register("E0107", "unmatched-closing-brace", "unmatched '}}'")
 INVALID_ESCAPE = _register("E0108", "invalid-escape", "invalid escape sequence '{escape}' in string")
+LEADING_ZERO = _register("E0109", "leading-zero", "leading zeros are not allowed in the number {number}")
 
 UNDECLARED_VARIABLE = _register("E0201", "undeclared-variable", "use of undeclared variable '{name}'")
 RESERVED_NAME = _register("E0202", "reserved-name", "'{name}' is a reserved word and cannot be used as a {what} name")
+ALREADY_DECLARED = _register("E0203", "already-declared", "'{name}' is already declared")
 
 UNDECLARED_LABEL = _register("E0301", "undeclared-label", "goto to undeclared label '{name}'")
 DUPLICATE_LABEL = _register("E0302", "duplicate-label", "duplicate label '{name}'")
@@ -70,7 +73,23 @@ GOTO_INTO_BLOCK = _register(
     "goto '{name}' jumps into a nested block; a goto may only jump within its own block or out to an enclosing block",
 )
 
-NUMBER_TOO_LARGE = _register("E0401", "number-too-large", "number {value} is too large for a float")
+NUMBER_TOO_LARGE = _register("E0401", "number-too-large", "number {value} does not fit in {type}")
+
+TYPE_MISMATCH = _register(
+    "E0501", "type-mismatch", "cannot assign a value of type {found} to '{name}', which has type {expected}",
+)
+NO_COMMON_TYPE = _register("E0502", "no-common-type", "'{op}' cannot mix {left} and {right}")
+CONSTANT_OVERFLOW = _register("E0503", "constant-overflow", "constant expression {value} does not fit in {type}")
+CONSTANT_DIVISION_BY_ZERO = _register(
+    "E0504", "constant-division-by-zero", "division by zero in a constant expression",
+)
+
+ASSIGNMENT_COUNT_MISMATCH = _register(
+    "E0601", "assignment-count-mismatch", "assignment has {targets} but {values}",
+)
+DUPLICATE_TARGET = _register(
+    "E0602", "duplicate-assignment-target", "'{name}' is assigned more than once in one statement",
+)
 
 
 @dataclass(frozen=True)
