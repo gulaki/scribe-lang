@@ -15,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--output", type=Path, default=Path("out.c"), help="generated C source")
     p.add_argument("--ast", action="store_true", help="print the AST")
     p.add_argument("--build", choices=["make", "ninja"], help="also generate a build file")
-    p.add_argument("--build-output", type=Path, help="build file path")
+    p.add_argument("--build-output", type=Path, help="build file path (default: next to the C file)")
     return p
 
 
@@ -30,7 +30,8 @@ def main(argv: list[str] | None = None) -> int:
             print(result.ast)
 
         if args.build:
-            build_file = args.build_output or Path("build.ninja" if args.build == "ninja" else "Makefile")
+            default_name = "build.ninja" if args.build == "ninja" else "Makefile"
+            build_file = args.build_output or args.output.parent / default_name
             executable = args.output.with_suffix("")
             compiler.write_build_file(
                 args.build,

@@ -1,0 +1,17 @@
+# PROPOSAL (v0.4): bounds-checked arrays from one runtime template.
+# Array[int] and Array[float] are two instantiations of the same audited C
+# template (see docs/design/lowering.md). Users never see a pointer.
+
+xs: Array[int] = [3, 1, 4, 1, 5]
+xs.push(9)                    # grows on the heap; freed when xs leaves scope
+print xs.length               # 6
+print xs[2]                   # 4
+# print xs[10]                # traps with "index 10 out of range 0..5", not UB
+
+sum: int = 0
+for x in xs {                 # borrows xs; lowers to an indexed C loop
+    sum = sum + x
+}
+print sum
+
+ys: Array[float] = Array[float].filled(0.0, 4)   # a second instantiation

@@ -1,0 +1,5 @@
+# expect: use of undeclared variable
+{
+    inner = 10
+}
+print inner

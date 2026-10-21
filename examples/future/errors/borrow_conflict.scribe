@@ -1,0 +1,7 @@
+# PROPOSAL: exclusive access. Mutating a collection while iterating it
+# is a compile error, so iterator invalidation cannot happen.
+#   error: `xs` is borrowed by the loop and cannot be mutated here
+xs: Array[int] = [1, 2, 3]
+for x in xs {
+    xs.push(x)
+}

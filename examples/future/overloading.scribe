@@ -1,0 +1,18 @@
+# PROPOSAL (v0.6): overloading on static types. The compiler picks one
+# overload per call site and lowers each to a distinct C function.
+
+fn describe(x: int) -> string   { return "int " + str(x) }
+fn describe(x: float) -> string { return "float " + str(x) }
+fn describe(x: bool) -> string  { return if x { "yes" } else { "no" } }
+
+print describe(3)             # -> describe__int
+print describe(3.5)           # -> describe__float
+print describe(true)          # -> describe__bool
+
+# Resolution: exact match first, then lossless widening (int -> float).
+# Anything still ambiguous is a compile error, never a silent pick.
+fn scale(x: float, k: float) -> float { return x * k }
+fn scale(x: int,   k: int)   -> int   { return x * k }
+
+print scale(2, 3)             # int version
+print scale(2, 3.0)           # float version via widening of 2

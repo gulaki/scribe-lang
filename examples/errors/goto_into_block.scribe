@@ -1,0 +1,6 @@
+# expect: jumps into a nested block
+goto inside
+{
+    label inside
+    print 1
+}
