@@ -2,17 +2,17 @@
 
 Rule: a feature may not ship until every row it touches has a mechanism and a test. **Mechanism** is one of: *reject* (compile error), *check* (runtime trap with a located message), *absent* (cannot be expressed in Scribe), *emit* (the emitter writes C that is defined).
 
-| # | C undefined behaviour | Mechanism | Status in v0.1 |
+| # | C undefined behaviour | Mechanism | Status |
 |---|---|---|---|
 | 1 | Signed integer overflow | check: `+ - *` and negation go through helpers that test with ISO C comparisons *before* the operation (CERT INT32-C); constants are folded exactly at compile time; `+%` etc. will wrap via unsigned casts | done for i64 (runtime trap, or E0503 for constants); wrapping operators planned |
 | 2 | Integer division/modulo by zero, `INT_MIN / -1` | check | done for i64 (runtime trap, or E0504 for constants); float `/ 0` gives IEEE `inf`, defined |
 | 3 | Shift by negative or too-large count | check; shifts take a masked/range-checked count | no shifts |
 | 4 | Out-of-bounds array/string access | check on every index; elided only when proven | no arrays |
 | 5 | Null dereference | absent: no pointers; optional values are `T \| none` and need `match` | n/a |
-| 6 | Use of uninitialised variable | emit: every variable is zero-initialised (globals and block locals) | done |
+| 6 | Use of uninitialised variable | emit: every variable is zero-initialised (globals and block locals), and a declaration assigns its value or zero every time it runs | done |
 | 7 | Use after free, double free, dangling pointer | absent: no pointers; ownership and second-class borrows (memory-model.md) | n/a |
 | 8 | Memory leak (not UB, but forbidden) | emit: scope-exit frees on every path | n/a |
-| 9 | Unsequenced modifications / unspecified evaluation order | emit: operands with side effects are hoisted to temporaries; Scribe defines left-to-right | expressions are pure today |
+| 9 | Unsequenced modifications / unspecified evaluation order | emit: operands with side effects are hoisted to temporaries; Scribe defines left-to-right | expressions are pure today; multiple assignment evaluates its values left to right (into temporaries when a value reads an earlier target), so runtime errors happen in source order |
 | 10 | Strict-aliasing violations | absent: no casts between pointer types; byte access via `memcpy` | n/a |
 | 11 | Out-of-range float-to-int conversion, NaN to int (C11 6.3.1.4) | check in `i64(x)`; constants checked at compile time | done |
 | 12 | `printf`-style format string misuse | emit: strings print through `puts`/`fwrite`, never as formats | done |
@@ -33,9 +33,10 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 27 | Integer types narrower than `int` are promoted to `int` before arithmetic, so `u16 * u16` can overflow `int` | emit: small integer types will compute through helpers in a type wide enough for the result | n/a until i8..u32 exist (planned) |
 | 28 | Integer literal of the wrong type in a variadic call (`printf("%" PRId64, 5)` passes an `int`) | emit: integer constants are written `INT64_C(n)`; INT64_MIN as `(-INT64_C(9223372036854775807) - 1)` | done |
 
-## Known gaps in v0.1
+## Known gaps
 
-None open for the rows above. (Fixed: `input` no longer uses `scanf("%f")`; comparisons no longer get a second pair of parentheses.) Row 23 (forward progress) remains open.
+Row 23 (forward progress) is open. Rows marked n/a apply to features that do
+not exist yet; each must be done before its feature ships.
 
 ## Verification strategy
 

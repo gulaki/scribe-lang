@@ -10,9 +10,13 @@
 Try them:
 
 ```sh
-python -m scribe_lang.cli examples/primes.scribe -o build/primes.c
+mkdir -p build
+scribe examples/primes.scribe -o build/primes.c
 cc -std=c11 -o build/primes build/primes.c && echo 30 | build/primes
 ```
+
+Every feature these programs use is explained in the
+[language reference](../docs/language.md).
 
 Highlights: `types.scribe` (declarations, casts, chained and multiple
 assignment), `fibonacci.scribe` (`a, b = b, a + b`), `primes.scribe` (nested
@@ -22,7 +26,7 @@ block-scoped temporaries).
 `tests/test_example_folders.py` checks that every `errors/` file reports exactly
 the errors its header lists (nothing missing, nothing extra), that every error
 code has at least one `errors/` example, and that every `future/` file is still
-rejected. Run one to see the output: `python -m scribe_lang.cli examples/errors/many_syntax_errors.scribe`. When a
+rejected. Run one to see the output: `scribe examples/errors/many_syntax_errors.scribe`. When a
 feature ships, move its example up a level and record its run.
 The `future/` syntax is a design sketch, not a commitment; the reasoning is in
 [`docs/whitepaper.md`](../docs/whitepaper.md).

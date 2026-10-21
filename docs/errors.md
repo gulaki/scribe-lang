@@ -21,8 +21,10 @@ prints the same information as JSON on stderr.
    the next newline or `;`. If it opens a `{`, it ends at the matching `}`, so
    an error in `if x > {` skips the whole `if` and its body. An error at the
    very end of the file (such as a missing `}`) ends the search.
-2. **Names, scopes and labels.** This phase only runs when there are no syntax
-   errors. Each undeclared variable is reported at its first use only.
+2. **Names, scopes, labels and types.** This phase only runs when there are no
+   syntax errors. It also checks every conversion and assignment. Each
+   undeclared variable is reported at its first use only, and an expression
+   whose type is unknown because of an earlier error is not checked again.
 3. **C generation.** This phase only runs when there are no errors at all; no
    C file is written otherwise.
 

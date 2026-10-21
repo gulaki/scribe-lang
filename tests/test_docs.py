@@ -10,7 +10,8 @@ fence tag:
                  `# expect: <code> at <line>:<column>` lines list.
 
 Proposed syntax that does not compile yet goes in untagged or ```text blocks.
-Every relative link in those files must point to a file that exists.
+Every relative link in those files must point to a file that exists, and a
+`#section` in a link to a Markdown heading that exists.
 """
 import re
 from pathlib import Path
@@ -72,14 +73,25 @@ def test_scribe_error_snippet_reports_the_expected_errors(compiler, source, foll
     assert [(d.code.code, d.span.line, d.span.column) for d in result.diagnostics] == expected, result.render()
 
 
+def anchors(path: Path) -> set[str]:
+    """GitHub's anchors for the headings of a Markdown file."""
+    text = FENCE.sub("", path.read_text(encoding="utf-8"))
+    headings = re.findall(r"^#+ (.+)$", text, re.MULTILINE)
+    return {re.sub(r"[^\w\- ]", "", h.strip().lower()).replace(" ", "-") for h in headings}
+
+
 @pytest.mark.parametrize("path", DOCS, ids=lambda p: str(p.relative_to(ROOT)))
 def test_relative_links_point_to_existing_files(path):
     text = FENCE.sub("", path.read_text(encoding="utf-8"))
     broken = []
     for target in LINK.findall(text):
-        if re.match(r"[a-z]+:", target) or target.startswith("#"):
-            continue  # a URL or an anchor in the same file
-        if not (path.parent / target.split("#")[0]).exists():
+        if re.match(r"[a-z]+:", target):
+            continue  # a URL
+        file, _, anchor = target.partition("#")
+        linked = path.parent / file if file else path
+        if not linked.exists():
+            broken.append(target)
+        elif anchor and linked.suffix == ".md" and anchor not in anchors(linked):
             broken.append(target)
     assert not broken, f"broken links: {broken}"
 

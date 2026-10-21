@@ -1,12 +1,32 @@
 # Type system
 
-Status: **scalars i64, f64 and f32 are implemented** (with literals, inference,
-declarations, chained and multiple assignment, casts and checked arithmetic). The rest of this page is the design for what
-comes next; items marked *planned* do not exist yet.
+Status: **scalars i64, f64 and f32 are implemented**, with literals,
+inference, declarations, chained and multiple assignment, casts and checked
+arithmetic. To *use* them, read the [language reference](../language.md).
+This page records the rules, the reasons for them, and what comes next; items
+marked *planned* do not exist yet.
 
 The goal that decides every rule here: arithmetic is never silently wrong.
 No implicit conversion loses information, and integer overflow is a runtime
 error, never C undefined behaviour or a quiet wrap.
+
+## Status and next steps
+
+The type system is built in numbered tasks, each starting from failing tests.
+
+| # | Task | Status |
+|---|---|---|
+| 1 | `i64`, `f64`, `f32`; Python-style literals; inference; checked i64 arithmetic; casts | done |
+| 2 | `bool`, `true`/`false`, `and`/`or`/`not`; conditions as expressions (`while n {`) | next |
+| 3 | `i8` ... `i32`, `u8` ... `u64` (`char`, `byte` = `u8`), the full promotion table | planned |
+| 4 | Explicit declarations `i64: a, b = 5` | done |
+| 5 | Chained `a = b = 0` and multiple `a, b = b, a` assignment | done |
+| 6 | `**` | planned |
+| 7 | `f16`, `f128`, per target | planned |
+| 8 | Range analysis that removes provably safe checks | planned |
+
+Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`) and
+`%`. Open: how runtime failures relate to function errors.
 
 ## Scalars
 
@@ -215,7 +235,7 @@ types follow one resolution rule.
 
 ## Unions
 
-`type Number = int | float`. A union value is `{tag, payload}`. `match` is the only elimination form and must be exhaustive. Members must be distinct types (no `int | int`); unions flatten (`(A|B)|C` is `A|B|C`). Passing a union to an overloaded function is allowed only when each member resolves to a candidate; the compiler emits the switch.
+`type Number = i64 | f64`. A union value is `{tag, payload}`. `match` is the only elimination form and must be exhaustive. Members must be distinct types (no `i64 | i64`); unions flatten (`(A|B)|C` is `A|B|C`). Passing a union to an overloaded function is allowed only when each member resolves to a candidate; the compiler emits the switch.
 
 ## Generics
 
