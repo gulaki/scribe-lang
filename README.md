@@ -1,8 +1,107 @@
-# Scribe Lang — Python + Lark
+# Scribe
 
-Inspired from Austin Z. Henley's three-part Teeny Tiny compiler tutorial.
+Scribe is a small language that compiles to C. It is meant to be easy to read and
+write, and hard to get wrong: **a program that compiles never reaches
+undefined behaviour in C**. Integer overflow, for example, stops the program
+with the Scribe position instead of silently wrapping. The generated C is
+plain, readable and builds with `cc -std=c11 -pedantic-errors`.
 
-The original compiler is deliberately educational: it has a hand-written lexer, a hand-written recursive-descent parser, and an emitter that produces C. This version keeps the language and C target, but changes the architecture so that language evolution does not require rewriting the compiler front-end.
+The compiler is written in Python with [Lark](https://github.com/lark-parser/lark).
+It started from Austin Z. Henley's Teeny Tiny compiler tutorial, rebuilt so that
+the language can grow without rewriting the front end.
+
+## Quick start
+
+You need Python 3.10 or later and a C compiler (`cc`, `gcc` or `clang`).
+
+```sh
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e .
+
+mkdir -p build
+scribe examples/types.scribe -o build/types.c
+cc -std=c11 build/types.c -o build/types
+build/types
+```
+
+`scribe` is the same as `python -m scribe_lang.cli`. Programs that read input
+take it on stdin: `echo 10 | build/factorial` after building
+`examples/factorial.scribe` the same way.
+
+The compiler can also write a build file next to the C file:
+
+```sh
+scribe examples/factorial.scribe -o build/factorial.c --build make     # build/Makefile
+make -C build
+scribe examples/factorial.scribe -o build/factorial.c --build ninja    # build/build.ninja
+ninja -C build
+```
+
+Other options: `--ast` prints the syntax tree, `--build-output PATH` puts the
+build file elsewhere, and `--diagnostics-format json` prints errors as JSON.
+
+## A tour
+
+```scribe
+# stdin: 10
+i64: n                     # a declaration: n is an i64, starting at 0
+input n                    # reads a whole number
+a, b = 0, 1                # multiple assignment
+while n > 0 {
+    a, b = b, a + b        # both values use the old a and b
+    n = n - 1
+}
+print a
+mean = f64(a) / 2          # i64 and f64 only mix through a cast
+print mean
+low = high = 0x10          # chained assignment; Python-style literals
+if low + high >= 32 {
+    print "big"
+} else {
+    print "small"
+}
+print 7 / 2                # integer division truncates
+```
+
+```output
+55
+27.50
+big
+3
+```
+
+- **[The language reference](docs/language.md)**: every feature, with
+  examples that the test suite runs, and what is not available yet.
+- **[Examples](examples/README.md)**: complete programs, programs that show
+  each error, and proposed syntax for later versions.
+- **[Errors](docs/errors.md)**: every error code and runtime error.
+- **[Whitepaper](docs/whitepaper.md)** and [design documents](docs/design/):
+  the goals, the roadmap and the reasoning behind the rules.
+
+## Errors
+
+Every error in a file is reported in one run, in the style of gcc and clang:
+
+```text
+$ python -m scribe_lang.cli examples/errors/many_semantic_errors.scribe
+examples/errors/many_semantic_errors.scribe:9:7: error[E0201]: use of undeclared variable 'total'
+ 9 | print total
+   |       ^~~~~
+...
+7 errors generated.
+```
+
+Add `--diagnostics-format json` for machine-readable output. Codes, what they mean, and how to add new ones are in [`docs/errors.md`](docs/errors.md).
+
+## Test
+
+```bash
+python -m pytest                     # everything, including compiling the docs' examples
+SCRIBE_SANITIZE=1 python -m pytest   # also build every run with UBSan
+```
+
+Tests that build C skip themselves when no C compiler is installed.
 
 ## Architecture
 
@@ -21,7 +120,7 @@ The original compiler is deliberately educational: it has a hand-written lexer, 
                                    ▼
                          ┌────────────────────┐
                          │ SemanticAnalyzer   │
-                         │ scopes / labels    │
+                         │ scopes / types     │
                          └─────────┬──────────┘
                                    │   every phase reports to a shared
                                    │   Diagnostics collector; C is only
@@ -32,6 +131,7 @@ The original compiler is deliberately educational: it has a hand-written lexer, 
                   ┌──────────────┐     ┌───────────────┐
                   │ CEmitter     │     │ future backend│
                   │ AST → C      │     │ AST → LLVM... │
+                  │ + checks     │     │               │
                   └──────┬───────┘     └───────────────┘
                          │
                          ▼
@@ -54,7 +154,7 @@ The parser produces a stable AST. Semantic analysis and code generation consume 
 
 ### 3. Semantic analysis is separate
 
-Variable, scope and label checks are not mixed into parsing or C generation. The analyzer builds a `Scope` for every block and the C backend reads those scopes to decide where each variable is declared. This keeps paying off as the language gets functions, classes, types, or overload resolution.
+Name, scope, label and type checks are not mixed into parsing or C generation. The analyzer builds a `Scope` for every block, gives every variable and expression a type (`scribe_lang/types.py` holds the type table and the mixing rule), and the C backend reads that model to decide where each variable is declared and which checked helper each operation needs. This keeps paying off as the language gets functions, classes or overload resolution.
 
 ### 4. Backends are replaceable
 
@@ -68,115 +168,6 @@ Make/Ninja support is not tangled into code generation. More build systems can b
 
 Phases never print or raise for mistakes in the program. They report `Diagnostic`s (stable code, span, notes, help) to a shared collector and keep going, so one run shows every error. `Compiler.compile()` returns a `CompilationResult` with the diagnostics, and `render.py` formats them as gcc-style text or JSON.
 
-## Install
-
-```bash
-python -m venv .venv
-# Windows: .venv\\Scripts\\activate
-# Linux/macOS: source .venv/bin/activate
-pip install -e .
-```
-
-## Compile
-
-```bash
-python -m scribe_lang.cli examples/fibonacci.scribe -o build/fibonacci.c
-```
-
-Generate Make:
-
-```bash
-python -m scribe_lang.cli examples/fibonacci.scribe \
-  -o build/fibonacci.c \
-  --build make \
-  --build-output build/Makefile
-```
-
-Generate Ninja:
-
-```bash
-python -m scribe_lang.cli examples/fibonacci.scribe \
-  -o build/fibonacci.c \
-  --build ninja \
-  --build-output build/build.ninja
-```
-
-## Language reference
-
-```text
-# Comments run to the end of the line.
-print "text"            # string
-i64: n, count = 1       # declarations: n is 0, count is 1
-input n                 # read a value of n's type
-x = (n + 1) * 2         # i64 arithmetic is checked: overflow stops the program
-r = 0.5                 # f64; `0.5f` would be f32
-print x                 # integers print as integers
-print r * 2             # floats print with two decimals
-print f64(n) * r        # i64 and f64 do not mix: convert explicitly
-a = b = 0               # chained assignment
-a, b = b, a + 1         # multiple assignment: both values use the old a and b
-
-if x > 10 {             # comparison operators: == != > >= < <=
-    print "big"
-} elif x > 5 {
-    print "medium"
-} else {
-    print "small"
-}
-
-while x > 0 {
-    x = x - 1
-}
-
-{                       # a bare block is just a scope
-    scratch = 1
-}
-
-label top               # labels and goto still exist
-goto top
-```
-
-**Blocks and separators.** Statements are separated by newlines or `;`, so a block may sit on one line: `if x > 0 { print x; x = x - 1 }`. The opening `{` must be on the same line as its `if`/`elif`/`else`/`while`, and `}` must be on the same line as the `elif`/`else` that follows it (`} else {`).
-
-**Scope rules.**
-
-- `{ ... }` opens a scope; the program itself is the outermost scope.
-- `x = e` and `input x` assign to `x` if a variable named `x` is already visible. Otherwise they declare `x` in the innermost scope. There is no shadowing.
-- `i64: x` always declares `x` in the innermost scope, and it is an error if `x` is already visible.
-- `a = b = c = e` is `c = e; b = c; a = b`. `a, b = x, y` evaluates every value before assigning, so `a, b = b, a` swaps.
-- The right-hand side is checked first, so `x = x + 1` is an error unless `x` already exists.
-- A variable is gone after the block that declared it ends, and the blocks of an `if`/`elif`/`else` chain are separate scopes.
-- Conditions of `if`, `elif` and `while` are evaluated in the enclosing scope.
-- Labels share one program-wide namespace. `goto` may jump within its own block or out to an enclosing block, never into a nested block.
-- `print`, `input`, `if`, `elif`, `else`, `while`, `label` and `goto` are reserved words, and so are the type names (`i8` ... `i64`, `u8` ... `u64`, `f16` ... `f128`, `bool`, `char`, `byte`, `str`).
-
-**Types.** Scribe has `i64`, `f64` and `f32` today. A variable gets the type of its first assignment and keeps it, or the type of its declaration (`f32: x, y = 1`, zero unless given a value); `input` into a new variable makes it f64. Number literals use Python syntax (`1_000`, `0x1f`, `0o17`, `0b101`, `2.5`, `1e-3`, and `2.5f` for f32) and take the type their context needs, if their value fits exactly; on their own they are i64 and f64. Integer constant expressions are folded exactly at compile time, and `/` on integers truncates toward zero (`7 / 2` is 3). Mixing types only happens without a cast when nothing can be lost (`f32 + f64` is f64); `i64 + f64` needs `f64(n)` or `i64(x)`. Integer overflow, integer division by zero and an out-of-range `i64(x)` stop the program with a `runtime error` and the Scribe position. See [docs/design/type-system.md](docs/design/type-system.md).
-
-**What the C looks like.** Program-level variables become zero-initialised globals. A variable first assigned inside a block is declared as, for example, `int64_t v_x = 0;` at the top of the matching C block, so every variable starts at 0 and a `goto` inside a block can never jump over a declaration. Scribe variable `x` becomes C `v_x` and label `top` becomes `l_top`, so any Scribe name is safe even when it is a C keyword or a `<stdio.h>` name (`int`, `printf`, `EOF`). Integer constants are emitted as `INT64_C(7)`, float literals exactly (as a hex float with the decimal in a comment when the decimal would not be exact), and i64 arithmetic as calls to small checked helpers such as `scribe_add_i64`, emitted only when used. String `print` uses `puts` with an escaped, ASCII-only literal, so `%` and non-ASCII text print as written.
-
-**Build files** are written next to the C file by default, with paths relative to the build file's own directory. Run them from there: `make -C build` or `ninja -C build`.
-
-## Errors
-
-Every error in a file is reported in one run, in the style of gcc and clang:
-
-```text
-$ python -m scribe_lang.cli examples/errors/many_semantic_errors.scribe
-examples/errors/many_semantic_errors.scribe:9:7: error[E0201]: use of undeclared variable 'total'
- 9 | print total
-   |       ^~~~~
-...
-7 errors generated.
-```
-
-Add `--diagnostics-format json` for machine-readable output. Codes, what they mean, and how to add new ones are in [`docs/errors.md`](docs/errors.md).
-
-## Test
-
-```bash
-python -m pytest
-```
-
 ## Extending the language
 
 ### Add a new syntax construct
@@ -185,13 +176,14 @@ python -m pytest
 2. Add an AST node to `scribe_lang/ast.py`.
 3. Add a Transformer method in `parser.py`.
 4. Add semantic checks in `semantics.py`, reporting errors with new codes (see [`docs/errors.md`](docs/errors.md#adding-an-error)).
-5. Add code generation in the backend(s).
+5. Add code generation in the backend(s). If the C can reach undefined behaviour, add a row to [`docs/design/ub-catalogue.md`](docs/design/ub-catalogue.md) and a runtime check.
 6. Add tests, and an `examples/errors/` file for each new error code.
+7. Document it in [`docs/language.md`](docs/language.md) with `scribe` examples. `tests/test_docs.py` compiles and runs them, so the page cannot fall behind the compiler.
 
-For example, a future function syntax could be:
+For example, the planned function syntax ([`examples/future/functions.scribe`](examples/future/functions.scribe)) is:
 
 ```text
-function fib(n) {
+fn fib(n: i64) -> i64 {
     if n <= 1 {
         return n
     }
@@ -203,20 +195,18 @@ The grammar would gain `function_decl`, `parameter_list`, `return_stmt`, and `ca
 
 ### Add classes
 
-Classes should not be bolted directly onto `CEmitter`. Add a type/symbol layer first:
+Classes should not be bolted directly onto `CEmitter`. The type layer already exists (`ScalarType` in `types.py`, `Symbol.type` and `Scope` in `semantics.py`); classes extend it:
 
 ```text
 ClassDecl
   ├── fields
   └── methods
 
-TypeInfo
-Scope
-Symbol
+ClassType      (next to ScalarType)
 FunctionSignature
 ```
 
-Then choose how the target represents objects: C structs + functions, C++, LLVM IR, etc.
+The plan for how objects are owned and freed is in [`docs/design/memory-model.md`](docs/design/memory-model.md).
 
 ### Change the surface syntax
 
