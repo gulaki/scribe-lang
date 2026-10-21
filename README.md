@@ -106,13 +106,15 @@ python -m scribe_lang.cli examples/fibonacci.scribe \
 ```text
 # Comments run to the end of the line.
 print "text"            # string
-n = 0                   # assignment declares: n is an i64
+i64: n, count = 1       # declarations: n is 0, count is 1
 input n                 # read a value of n's type
 x = (n + 1) * 2         # i64 arithmetic is checked: overflow stops the program
 r = 0.5                 # f64; `0.5f` would be f32
 print x                 # integers print as integers
 print r * 2             # floats print with two decimals
 print f64(n) * r        # i64 and f64 do not mix: convert explicitly
+a = b = 0               # chained assignment
+a, b = b, a + 1         # multiple assignment: both values use the old a and b
 
 if x > 10 {             # comparison operators: == != > >= < <=
     print "big"
@@ -140,13 +142,15 @@ goto top
 
 - `{ ... }` opens a scope; the program itself is the outermost scope.
 - `x = e` and `input x` assign to `x` if a variable named `x` is already visible. Otherwise they declare `x` in the innermost scope. There is no shadowing.
+- `i64: x` always declares `x` in the innermost scope, and it is an error if `x` is already visible.
+- `a = b = c = e` is `c = e; b = c; a = b`. `a, b = x, y` evaluates every value before assigning, so `a, b = b, a` swaps.
 - The right-hand side is checked first, so `x = x + 1` is an error unless `x` already exists.
 - A variable is gone after the block that declared it ends, and the blocks of an `if`/`elif`/`else` chain are separate scopes.
 - Conditions of `if`, `elif` and `while` are evaluated in the enclosing scope.
 - Labels share one program-wide namespace. `goto` may jump within its own block or out to an enclosing block, never into a nested block.
 - `print`, `input`, `if`, `elif`, `else`, `while`, `label` and `goto` are reserved words, and so are the type names (`i8` ... `i64`, `u8` ... `u64`, `f16` ... `f128`, `bool`, `char`, `byte`, `str`).
 
-**Types.** Scribe has `i64`, `f64` and `f32` today. A variable gets the type of its first assignment and keeps it; `input` into a new variable makes it f64. Number literals use Python syntax (`1_000`, `0x1f`, `0o17`, `0b101`, `2.5`, `1e-3`, and `2.5f` for f32) and take the type their context needs, if their value fits exactly; on their own they are i64 and f64. Integer constant expressions are folded exactly at compile time, and `/` on integers truncates toward zero (`7 / 2` is 3). Mixing types only happens without a cast when nothing can be lost (`f32 + f64` is f64); `i64 + f64` needs `f64(n)` or `i64(x)`. Integer overflow, integer division by zero and an out-of-range `i64(x)` stop the program with a `runtime error` and the Scribe position. See [docs/design/type-system.md](docs/design/type-system.md).
+**Types.** Scribe has `i64`, `f64` and `f32` today. A variable gets the type of its first assignment and keeps it, or the type of its declaration (`f32: x, y = 1`, zero unless given a value); `input` into a new variable makes it f64. Number literals use Python syntax (`1_000`, `0x1f`, `0o17`, `0b101`, `2.5`, `1e-3`, and `2.5f` for f32) and take the type their context needs, if their value fits exactly; on their own they are i64 and f64. Integer constant expressions are folded exactly at compile time, and `/` on integers truncates toward zero (`7 / 2` is 3). Mixing types only happens without a cast when nothing can be lost (`f32 + f64` is f64); `i64 + f64` needs `f64(n)` or `i64(x)`. Integer overflow, integer division by zero and an out-of-range `i64(x)` stop the program with a `runtime error` and the Scribe position. See [docs/design/type-system.md](docs/design/type-system.md).
 
 **What the C looks like.** Program-level variables become zero-initialised globals. A variable first assigned inside a block is declared as, for example, `int64_t v_x = 0;` at the top of the matching C block, so every variable starts at 0 and a `goto` inside a block can never jump over a declaration. Scribe variable `x` becomes C `v_x` and label `top` becomes `l_top`, so any Scribe name is safe even when it is a C keyword or a `<stdio.h>` name (`int`, `printf`, `EOF`). Integer constants are emitted as `INT64_C(7)`, float literals exactly (as a hex float with the decimal in a comment when the decimal would not be exact), and i64 arithmetic as calls to small checked helpers such as `scribe_add_i64`, emitted only when used. String `print` uses `puts` with an escaped, ASCII-only literal, so `%` and non-ASCII text print as written.
 

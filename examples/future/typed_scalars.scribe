@@ -1,13 +1,10 @@
 # PROPOSAL: the parts of the scalar types that do not exist yet.
-# i64, f64, f32, literals and casts work today; see docs/design/type-system.md.
+# i64, f64, f32, declarations, chained and multiple assignment and casts work
+# today; see docs/design/type-system.md and examples/types.scribe.
 
-i32: count = 10, limit          # explicit declarations, zero-initialised
+i32: count = 10, limit          # sized integers
 u8: mask = 0xff
 done = false                    # bool
-
-a = b = c = 0                   # chained assignment
-lo, hi = 0, 1                   # every right-hand side is evaluated first...
-lo, hi = hi, lo                 # ...so this swaps
 
 big = i64(count) * 3_000_000_000      # i32 * i64 works in i64
 ratio = f64(count) ** 0.5             # ** lowers to pow

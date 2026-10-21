@@ -1,7 +1,7 @@
 # Type system
 
 Status: **scalars i64, f64 and f32 are implemented** (with literals, inference,
-casts and checked arithmetic). The rest of this page is the design for what
+declarations, chained and multiple assignment, casts and checked arithmetic). The rest of this page is the design for what
 comes next; items marked *planned* do not exist yet.
 
 The goal that decides every rule here: arithmetic is never silently wrong.
@@ -47,7 +47,9 @@ zero, as in C (`7 / 2` is 3, `-7 / 2` is -3). An overflowing result (E0503)
 and division by zero (E0504) are compile errors. Float constant expressions
 are *not* folded, so `0.1 + 0.2` behaves exactly as it does at run time.
 
-## Variables: assignment is declaration
+## Variables
+
+### Assignment is declaration
 
 A variable's type is fixed by its first assignment, in source order, and never
 changes. A later assignment must convert losslessly (E0501):
@@ -65,10 +67,61 @@ input d       # a new variable from `input` is f64
 `input` reads the variable's own type. A token that is not a valid value of
 that type (text, `4.5` for an i64, out of range, `nan`, `inf`) reads as 0.
 
-*Planned:* explicit declarations `i32: a, b, c = 5, d` (zero-initialised
-unless given a value), chained assignment `a = b = c = 10`, and multiple
-assignment `a, b = x, y`, which evaluates every right-hand side first (so
-`a, b = b, a` swaps).
+### Explicit declarations
+
+```
+i64: a, b = 5, c   # a and c are 0, b is 5
+f64: x, y          # both 0.0
+i64: n = 1, m = n  # declarators run left to right
+```
+
+A declaration names its type and always makes a new variable in the
+innermost block. Each variable is zero unless given a value, and a value
+follows the assignment rules above (`i64: n = 2.5` is E0501). The variable
+cannot be read by its own value (`i64: a = a` is E0201).
+
+- **No shadowing.** Declaring a name that is already visible, in this block
+  or an enclosing one, is an error (E0203). Sibling blocks may each declare
+  the same name.
+- **The declaration runs.** It assigns its value (or zero) every time it
+  executes, so after a backward `goto` the variable starts again. Like every
+  variable, it is also declared and zeroed at the top of its C block, so a
+  `goto` can never skip its declaration.
+- Only the types that exist can be declared: `i64`, `f64` and `f32` for now.
+
+### Chained assignment
+
+`a = b = c = e` means `c = e`, then `b = c`, then `a = b`. The value is
+computed once, and each step is an ordinary assignment: a new target takes the
+type of the target to its right, and an existing one must convert losslessly.
+
+```
+a = b = c = 10     # all i64
+d = 1.0
+d = f = 2.5f       # f is f32, and f32 -> f64 is fine for d
+```
+
+### Multiple assignment
+
+`a, b = x, y` evaluates **every value first**, left to right, then assigns the
+targets left to right. It is shorthand for the assignments, not a tuple, and
+each target follows the rules for its own value (`n, x = 1, 2.5` makes an
+i64 and an f64).
+
+```
+a, b = b, a        # swap
+a, b = b, a + b    # one Fibonacci step
+```
+
+Because the values come first, a variable this statement declares cannot be
+read by the values: `temp, a, b = a, b, temp` is an error (E0201) when `temp`
+is new. The names and values must match in number (E0601), and no name may
+appear twice in a chained or multiple assignment (E0602).
+
+The C is plain assignments when that gives the same result. A value that
+reads a target assigned before it needs the old value, so then every value is
+first computed into a temporary (`t_1`, `t_2`, ...) in a C block of its own.
+That also keeps runtime errors in left-to-right order.
 
 ## Mixing types
 
