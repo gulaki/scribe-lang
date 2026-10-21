@@ -243,3 +243,68 @@ def test_every_grammar_terminal_has_a_readable_name():
     terminals = {t.name for t in PARSER._parser.terminals}
     ignored = {"COMMENT"} | {t for t in terminals if t.startswith("__")}
     assert terminals - ignored <= set(_TERMINAL_WORDS) | _KEYWORDS
+
+
+# -- recovery: one error per broken statement ---------------------------------
+
+def error_positions(source):
+    return [(code, line, column) for code, line, column, _ in syntax_errors(source)]
+
+
+def test_every_broken_statement_is_reported():
+    source = "x = \nprint 1 2\ny = 3 @ 4; z = (\nprint \"ok\"\n"
+    assert error_positions(source) == [("E0101", 1, 5), ("E0101", 2, 9), ("E0102", 3, 7), ("E0101", 3, 17)]
+
+
+def test_statements_after_an_error_are_still_checked():
+    assert error_positions("x = \nprint 1\nprint 2 2\n") == [("E0101", 1, 5), ("E0101", 3, 9)]
+
+
+def test_errors_inside_a_block_keep_the_block():
+    # Only the broken lines are skipped; the block and its braces survive, so
+    # there is no follow-on error about the closing '}'.
+    source = "while 1 > 0 {\n    a = \n    b = 1 1\n}\nc = \n"
+    assert error_positions(source) == [("E0101", 2, 9), ("E0101", 3, 11), ("E0101", 5, 5)]
+
+
+def test_an_error_in_a_block_header_skips_the_whole_block():
+    # Errors inside the skipped body are not reported: the body is gone.
+    source = "while x > {\n    y = \n}\nz = \n"
+    assert error_positions(source) == [("E0101", 1, 11), ("E0101", 4, 5)]
+
+
+def test_misplaced_else_skips_its_block_too():
+    source = "if 1 > 0 {\n    print 1\n}\nelse {\n    print 2\n}\nx = \n"
+    assert [line for _, line, _ in error_positions(source)] == [4, 7]
+
+
+def test_braces_and_separators_in_strings_and_comments_do_not_confuse_recovery():
+    source = 'print "a;{" 1\nx = 1 # { ;\ny = \n'
+    assert error_positions(source) == [("E0101", 1, 13), ("E0101", 3, 5)]
+
+
+def test_unterminated_string_skips_only_its_line():
+    assert error_positions('print "abc\nx = \n') == [("E0102", 1, 7), ("E0101", 2, 5)]
+
+
+def test_semicolon_separated_statements_recover_independently():
+    assert error_positions("a = ; b = 1; c = 1 1\n") == [("E0101", 1, 5), ("E0101", 1, 20)]
+
+
+def test_an_error_at_the_end_of_the_file_ends_recovery():
+    codes = [code for code, _, _ in error_positions("x = \nif 1 > 0 {\n    print 1\n")]
+    assert codes == ["E0101", "E0103"]
+
+
+def test_recovery_stops_at_the_error_limit(monkeypatch):
+    import scribe_lang.parser as parser_module
+
+    monkeypatch.setattr(parser_module, "MAX_SYNTAX_ERRORS", 3)
+    assert len(syntax_errors("a = \n" * 10)) == 3
+
+
+def test_a_valid_program_after_recovery_still_returns_none():
+    # Recovery only finds more errors; the program is still rejected.
+    diags = Diagnostics()
+    assert PARSER.parse("x = \nprint 1\n", diags) is None
+    assert len(diags) == 1

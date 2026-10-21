@@ -156,20 +156,89 @@ class Parser:
         )
 
     def parse(self, source: str, diagnostics: Diagnostics | None = None) -> Program | None:
-        """Parse `source`, or report syntax errors and return None.
+        """Parse `source`, or report every syntax error and return None.
+
+        After an error the parser skips to the next statement and carries on
+        (see `_skip_statement`), so one run reports one error per broken
+        statement, up to MAX_SYNTAX_ERRORS. An error at the end of the file
+        cannot be skipped and ends the search.
 
         Without a `diagnostics` collector, a syntax error raises ParseError
         (which carries the diagnostics) instead; handy in tests and scripts.
         """
         sink = diagnostics if diagnostics is not None else Diagnostics()
-        try:
-            tree = self._parser.parse(source)
-        except UnexpectedInput as exc:
-            _report_syntax_error(exc, sink, source)
+        text = source
+        tree = None
+        failed = False
+        for _ in range(MAX_SYNTAX_ERRORS):
+            try:
+                tree = self._parser.parse(text)
+                break
+            except UnexpectedInput as exc:
+                failed = True
+                _report_syntax_error(exc, sink, source)
+                text = _skip_statement(text, exc)
+                if text is None:
+                    break
+        if failed:
             if diagnostics is None:
-                raise ParseError(render_text(sink, source), sink) from exc
+                raise ParseError(render_text(sink, source), sink)
             return None
         return ASTBuilder().transform(tree)
+
+
+# -- recovery -----------------------------------------------------------------
+
+MAX_SYNTAX_ERRORS = 50
+
+_STRUCTURE = re.compile(r'"(?:[^"\\\n]|\\.)*"?|#[^\n]*|[{};\n]')
+
+
+def _skip_statement(text: str, exc: UnexpectedInput) -> str | None:
+    """`text` with the statement containing the error blanked out.
+
+    The statement runs from just after the previous separator (newline, `;`,
+    `{` or `}`) to the next newline or `;`. If it opens blocks, it runs on to
+    the `}` that closes them, so `if x > {` takes its whole body with it and
+    the braces stay balanced. Blanked characters become spaces and newlines
+    are kept, so every position reported later is still right.
+
+    Returns None when there is nothing left to skip (end of file).
+    """
+    if isinstance(exc, UnexpectedToken):
+        if exc.token.type == "$END":
+            return None
+        pos, width = exc.token.start_pos, max(len(exc.token), 1)
+    else:
+        pos, width = exc.pos_in_stream, 1
+
+    # Structural characters outside strings and comments.
+    marks = [(m.start(), m.group()) for m in _STRUCTURE.finditer(text) if len(m.group()) == 1]
+    start = 0
+    for index, char in marks:
+        if index >= pos:
+            break
+        start = index + 1
+    end = len(text)
+    depth = 0
+    for index, char in marks:
+        if index < start:
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            if depth == 0:
+                end = index
+                break
+            depth -= 1
+        elif depth == 0 and index >= pos:  # newline or ';'
+            end = index
+            break
+    end = max(end, pos + width)  # always skip at least the offending token
+
+    blanked = "".join(c if c in "\r\n" else " " for c in text[start:end])
+    new_text = text[:start] + blanked + text[end:]
+    return None if new_text == text else new_text
 
 
 # -- syntax error wording -----------------------------------------------------
