@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,6 +19,21 @@ STRICT_FLAGS = ["-std=c11", "-pedantic-errors", "-Wall", "-Wextra"]
 UBSAN_FLAGS = ["-fsanitize=undefined", "-fno-sanitize-recover=all"]
 # SCRIBE_SANITIZE=1 builds every end-to-end program with UBSan as well.
 EXTRA_FLAGS = UBSAN_FLAGS if os.environ.get("SCRIBE_SANITIZE") == "1" else []
+
+
+EXPECT = re.compile(r"# expect: (?P<code>[EW]\d{4}) at (?P<line>\d+):(?P<column>\d+)$")
+
+
+def expected_diagnostics(source: str) -> list[tuple[str, int, int]]:
+    """The `# expect: <code> at <line>:<column>` lines of a program that must
+    be rejected, as (code, line, column), in order."""
+    found = []
+    for line in source.splitlines():
+        if line.startswith("# expect:"):
+            match = EXPECT.match(line)
+            assert match, f"malformed expectation: {line!r}"
+            found.append((match["code"], int(match["line"]), int(match["column"])))
+    return found
 
 
 @pytest.fixture(scope="session")
