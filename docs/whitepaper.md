@@ -49,7 +49,7 @@ Text-level C templating (macros or string substitution) is cheap to start with b
 ### 2.6 No visible pointers; RAII with escape analysis; maybe ref counting later
 **Agree on the goal. The key design decision is what replaces lifetimes.** Rust solves this with lifetime annotations; Scribe should not. Recommendation, based on mutable value semantics (Hylo, Swift-style `inout`):
 
-- Aggregates (`struct`, `Array`, `string`) have **value semantics**: assignment is a (possibly lazy) copy or a move; no two live names alias the same mutable data.
+- Aggregates (`struct`, `Array`, `str`) have **value semantics**: assignment is a (possibly lazy) copy or a move; no two live names alias the same mutable data.
 - Function parameters are **borrowed by default** (read-only; `mut` for exclusive write access; `take` to move ownership in). Borrows are **second-class**: they may be passed down, but not stored in a field, captured, or returned. That single rule removes dangling references with no lifetime syntax.
 - Exclusive access is checked: you cannot mutate a collection while an iterator borrows it. This kills iterator invalidation.
 - Heap placement is **inferred**: values that don't escape live on the stack; escaping values get a unique owner and a compiler-inserted free on every exit path (including early `return`, `goto` and traps-that-clean-up).
