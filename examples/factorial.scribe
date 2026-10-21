@@ -1,4 +1,5 @@
 print "Enter number to calculate factorial:"
+num = 0                # an integer, so `input` reads a whole number
 input num
 print ""
 

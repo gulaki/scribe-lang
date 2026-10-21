@@ -2,6 +2,7 @@
 # Showcases: nested loops, `goto` as a "break/continue", and a remainder
 # computed with repeated subtraction (Scribe has no `%` operator).
 print "Print primes up to:"
+limit = 0              # an integer, so `input` reads a whole number
 input limit
 
 n = 2

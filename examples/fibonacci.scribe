@@ -1,4 +1,5 @@
 print "How many fibonacci numbers do you want?"
+nums = 0              # an integer, so `input` reads a whole number
 input nums
 print ""
 

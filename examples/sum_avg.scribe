@@ -1,4 +1,5 @@
 print "How many numbers?"
+N = 0                  # how many: an integer
 input N
 
 i = 0

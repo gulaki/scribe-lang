@@ -99,6 +99,7 @@ def test_standalone_block_scope(run_scribe):
 def test_goto_out_of_a_nested_block(run_scribe):
     program = '''\
 i = 1
+n = 0
 input n
 label loop
 print i
