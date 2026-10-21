@@ -1,4 +1,4 @@
-# expect: unexpected
+# expect: must be on the same line
 if 1 > 0 {
     print 1
 }

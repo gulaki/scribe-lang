@@ -189,11 +189,12 @@ def syntax_errors(source):
     ("if x {\n}\n", ("E0101", 1, 6, "unexpected '{'; expected a comparison operator")),
     ("goto 3\n", ("E0101", 1, 6, "unexpected number 3; expected a name")),
     ("x = (1 + 2\n", ("E0101", 1, 11, "unexpected end of line; expected ')'")),
-    ("x = 1\n}\n", ("E0101", 2, 1, "unexpected '}'; expected end of file")),
+    ("x = 1\n}\n", ("E0107", 2, 1, "unmatched '}'")),
     ("print 1 print 2\n", ("E0101", 1, 9, "unexpected 'print'; expected an operator or end of line")),
     ("x = 1 @ 2\n", ("E0102", 1, 7, "unexpected character '@'")),
     ("print\n", ("E0101", 1, 6, "unexpected end of line; expected an expression or a string")),
-    ("if 1 > 0 {\n    print 1\n\n", ("E0103", 2, 12, "unexpected end of file; expected '}'")),
+    ("if 1 > 0 {\n    print 1\n\n", ("E0104", 1, 10, "this block is never closed; missing '}'")),
+    ("x = (", ("E0103", 1, 6, "unexpected end of file; expected an expression")),
 ])
 def test_syntax_error_messages(source, expected):
     assert syntax_errors(source) == [expected]
@@ -284,7 +285,7 @@ def test_braces_and_separators_in_strings_and_comments_do_not_confuse_recovery()
 
 
 def test_unterminated_string_skips_only_its_line():
-    assert error_positions('print "abc\nx = \n') == [("E0102", 1, 7), ("E0101", 2, 5)]
+    assert error_positions('print "abc\nx = \n') == [("E0106", 1, 7), ("E0101", 2, 5)]
 
 
 def test_semicolon_separated_statements_recover_independently():
@@ -293,7 +294,7 @@ def test_semicolon_separated_statements_recover_independently():
 
 def test_an_error_at_the_end_of_the_file_ends_recovery():
     codes = [code for code, _, _ in error_positions("x = \nif 1 > 0 {\n    print 1\n")]
-    assert codes == ["E0101", "E0103"]
+    assert codes == ["E0101", "E0104"]
 
 
 def test_recovery_stops_at_the_error_limit(monkeypatch):
@@ -308,3 +309,96 @@ def test_a_valid_program_after_recovery_still_returns_none():
     diags = Diagnostics()
     assert PARSER.parse("x = \nprint 1\n", diags) is None
     assert len(diags) == 1
+
+
+# -- hints for common mistakes ------------------------------------------------
+
+def first_error(source):
+    diags = Diagnostics("t.scribe")
+    assert PARSER.parse(source, diags) is None
+    return diags.errors[0]
+
+
+@pytest.mark.parametrize("word", ["else", "elif"])
+def test_else_or_elif_on_a_new_line(word):
+    source = f"if 1 > 0 {{\n    print 1\n}}\n{word}{' 2 > 1' if word == 'elif' else ''} {{\n    print 2\n}}\n"
+    diag = first_error(source)
+    assert diag.code.code == "E0105"
+    assert (diag.span.line, diag.span.column, diag.span.end_column) == (4, 1, 5)
+    assert diag.message == f"'{word}' must be on the same line as the '}}' that closes the if block"
+    assert diag.help == f"join the lines: '}} {word} ...'"
+
+
+@pytest.mark.parametrize("word", ["print", "while", "goto", "input", "label", "if"])
+def test_assigning_to_a_keyword_is_explained(word):
+    diag = first_error(f"{word} = 2\n")
+    assert diag.code.code == "E0202"
+    assert diag.message == f"'{word}' is a reserved word and cannot be used as a variable name"
+    assert (diag.span.column, diag.span.end_column) == (1, 1 + len(word))
+
+
+def test_keyword_hint_needs_the_keyword_to_start_the_statement():
+    assert first_error("x print = 2\n").code.code == "E0101"
+
+
+def test_unclosed_block_points_at_its_brace_and_the_end_of_file():
+    diag = first_error("while 1 > 0 {\n    if 2 > 1 {\n        print 1\n    }\n")
+    assert diag.code.code == "E0104"
+    assert (diag.span.line, diag.span.column) == (1, 13)
+    ((message, span),) = [(n.message, n.span) for n in diag.notes]
+    assert message == "the file ends here"
+    assert (span.line, span.column) == (4, 6)
+
+
+def test_unclosed_block_names_the_innermost_open_brace():
+    diag = first_error("{\n    {\n        print 1\n")
+    assert (diag.code.code, diag.span.line, diag.span.column) == ("E0104", 2, 5)
+
+
+def test_unclosed_block_ignores_braces_in_strings_and_comments():
+    diag = first_error('{\n    print "}"\n    # }\n')
+    assert (diag.code.code, diag.span.line) == ("E0104", 1)
+
+
+def test_unmatched_closing_brace():
+    diag = first_error("x = 1\n}\nprint x\n")
+    assert (diag.code.code, diag.span.line, diag.span.column) == ("E0107", 2, 1)
+    assert diag.message == "unmatched '}'"
+
+
+def syntax_errors_full(source):
+    diags = Diagnostics("t.scribe")
+    PARSER.parse(source, diags)
+    return list(diags)
+
+
+def test_unmatched_brace_after_a_complete_block():
+    assert [d.code.code for d in syntax_errors_full("{\n    print 1\n}\n}\n")] == ["E0107"]
+
+
+def test_unterminated_string():
+    diag = first_error('print "abc\n')
+    assert diag.code.code == "E0106"
+    assert (diag.span.column, diag.span.end_column) == (7, 11)
+
+
+def test_invalid_escape_points_at_the_escape():
+    diag = first_error('print "a\\qb"\n')
+    assert diag.code.code == "E0108"
+    assert diag.message == "invalid escape sequence '\\q' in string"
+    assert (diag.span.column, diag.span.end_column) == (9, 11)
+
+
+def test_valid_escapes_before_an_invalid_one_are_skipped():
+    diag = first_error('print "\\n\\t\\"\\x"\n')
+    assert (diag.code.code, diag.span.column) == ("E0108", 14)
+
+
+def test_unterminated_string_after_valid_escapes():
+    assert first_error('print "a\\"b\n').code.code == "E0106"
+
+
+def test_every_hint_message_still_recovers():
+    source = "else {\n}\nprint = 1\nx = \"abc\ny = }\nz = 1 1\n"
+    codes = [d.code.code for d in syntax_errors_full(source)]
+    assert codes == ["E0105", "E0202", "E0106", "E0107", "E0101"]

@@ -208,7 +208,7 @@ def test_parse_error_with_filename():
 def test_parse_error_at_end_of_input_names_it():
     with pytest.raises(ParseError) as info:
         Parser().parse("if 1 > 0 {")
-    assert "unexpected end of file" in str(info.value)
+    assert "missing '}'" in str(info.value)
     assert "$END" not in str(info.value)
 
 

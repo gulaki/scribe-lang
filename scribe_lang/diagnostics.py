@@ -54,9 +54,11 @@ CANNOT_READ_SOURCE = _register("E0002", "cannot-read-source", "cannot read {path
 UNEXPECTED_TOKEN = _register("E0101", "unexpected-token", "unexpected {found}; expected {expected}")
 UNEXPECTED_CHARACTER = _register("E0102", "unexpected-character", "unexpected character {char}")
 UNEXPECTED_END_OF_FILE = _register("E0103", "unexpected-end-of-file", "unexpected end of file; expected {expected}")
-UNCLOSED_BLOCK = _register("E0104", "unclosed-block", "missing '}}' to close this block")
+UNCLOSED_BLOCK = _register("E0104", "unclosed-block", "this block is never closed; missing '}}'")
 MISPLACED_ELSE = _register("E0105", "misplaced-else", "'{word}' must be on the same line as the '}}' that closes the if block")
 UNTERMINATED_STRING = _register("E0106", "unterminated-string", "unterminated string")
+UNMATCHED_CLOSING_BRACE = _register("E0107", "unmatched-closing-brace", "unmatched '}}'")
+INVALID_ESCAPE = _register("E0108", "invalid-escape", "invalid escape sequence '{escape}' in string")
 
 UNDECLARED_VARIABLE = _register("E0201", "undeclared-variable", "use of undeclared variable '{name}'")
 RESERVED_NAME = _register("E0202", "reserved-name", "'{name}' is a reserved word and cannot be used as a {what} name")
