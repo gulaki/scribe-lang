@@ -45,6 +45,7 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0106 | unterminated-string | A string has no closing `"` on its line. |
 | E0107 | unmatched-closing-brace | A `}` with no `{` to close. |
 | E0108 | invalid-escape | A string escape other than `\"`, `\\`, `\n`, `\r` and `\t`. |
+| E0109 | leading-zero | A decimal number that starts with `0`, such as `017`. In C that would be octal 15. Write `17`, or `0o17` for octal. |
 | E0201 | undeclared-variable | A variable is read before anything was assigned to it in a visible scope. A note shows where a variable from a block that already ended was declared. |
 | E0202 | reserved-name | A keyword such as `print` or `else` used as a variable or label name. |
 | E0301 | undeclared-label | `goto` names a label that does not exist. |

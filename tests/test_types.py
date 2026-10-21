@@ -34,6 +34,12 @@ def test_float_literals(run_scribe, literal, expected):
     assert run_scribe(f"b = {literal}\nprint b\n") == expected
 
 
+def test_leading_zero_is_rejected_with_an_explanation(compiler):
+    result = compiler.compile("x = 017\n")
+    assert [d.code.code for d in result.diagnostics] == ["E0109"]
+    assert "0o17" in result.diagnostics[0].help
+
+
 def test_literal_types(compiler):
     model = compiler.compile("a = 5\nb = 5.0\nc = 5.0f\n").semantic_model
     assert [model.root.symbols[n].type for n in "abc"] == [I64, F64, F32]

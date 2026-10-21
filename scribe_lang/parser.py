@@ -493,12 +493,34 @@ def _hint_bad_string(err: _SyntaxError) -> bool:
     return False
 
 
+_LEADING_ZERO = re.compile(r"0[0-9_]*[0-9]")
+
+
+def _hint_leading_zero(err: _SyntaxError) -> bool:
+    # `017` matches no terminal: in C it would be octal 15, in Python it is
+    # an error, and Scribe follows Python.
+    if not isinstance(err.exc, UnexpectedCharacters) or err.exc.char != "0":
+        return False
+    pos = err.exc.pos_in_stream
+    match = _LEADING_ZERO.match(err.text, pos)
+    if match is None or (pos > 0 and (err.text[pos - 1].isalnum() or err.text[pos - 1] in "_.")):
+        return False
+    digits = match.group()
+    decimal = digits.lstrip("0_") or "0"
+    help = f"write {decimal} for a decimal number"
+    if set(decimal) <= set("01234567_"):
+        help += f", or 0o{decimal} for an octal one"
+    err.diagnostics.error(codes.LEADING_ZERO, err.span_at(pos, len(digits)), number=digits, help=help)
+    return True
+
+
 _HINTS = [
     _hint_misplaced_else,
     _hint_reserved_word_assignment,
     _hint_unclosed_block,
     _hint_unmatched_closing_brace,
     _hint_bad_string,
+    _hint_leading_zero,
 ]
 
 

@@ -96,10 +96,10 @@ STR: "str"
 
 STRING: /"([^"\\\n\r]|\\["\\nrt])*"/
 // Number literals use Python 3 syntax, `_` separators included. A decimal
-// integer cannot start with 0 (`017`), because in C that would be octal.
-// FLOAT_LIT is tried first (higher priority), so `1.5` is never lexed as `1`
-// followed by something else. A trailing `f` makes an f32 literal; it is only
-// allowed on float syntax, so `0x1f` is hex.
+// integer cannot start with 0 (`017`), because in C that would be octal; the
+// parser explains the error. FLOAT_LIT is tried first (higher priority), so
+// `1.5` is never lexed as `1` followed by something else. A trailing `f`
+// makes an f32 literal; it is only allowed on float syntax, so `0x1f` is hex.
 INT_LIT.2: /0[xX](?:_?[0-9a-fA-F])+|0[oO](?:_?[0-7])+|0[bB](?:_?[01])+|[1-9](?:_?[0-9])*|0(?:_?0)*(?![0-9])/
 FLOAT_LIT.3: /(?:(?:[0-9](?:_?[0-9])*)?\.[0-9](?:_?[0-9])*|[0-9](?:_?[0-9])*\.)(?:[eE][+-]?[0-9](?:_?[0-9])*)?f?|[0-9](?:_?[0-9])*[eE][+-]?[0-9](?:_?[0-9])*f?/
 IDENT: /[A-Za-z_][A-Za-z0-9_]*/
