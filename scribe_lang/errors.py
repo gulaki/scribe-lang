@@ -24,7 +24,15 @@ class Diagnostic:
 
 
 class CompilerError(Exception):
-    """Base class for compiler errors."""
+    """Base class for compiler errors.
+
+    Phases report problems to a Diagnostics collector. These exceptions exist
+    for callers that want to stop at an error, and carry the diagnostics.
+    """
+
+    def __init__(self, message: str, diagnostics=()):
+        super().__init__(message)
+        self.diagnostics = list(diagnostics)
 
 
 class ParseError(CompilerError):

@@ -25,4 +25,4 @@ def test_cli_reports_syntax_errors_for_the_old_keywords(tmp_path, capsys):
     src = tmp_path / "old.scribe"
     src.write_text("if 1 > 0 then\n    print 1\nendif\n", encoding="utf-8")
     assert main([str(src), "-o", str(tmp_path / "o.c")]) == 1
-    assert "unexpected token" in capsys.readouterr().err
+    assert "unexpected name 'then'" in capsys.readouterr().err

@@ -1,6 +1,7 @@
 import pytest
 
 from scribe_lang.ast import Block, Elif, If, Let, Print, While
+from scribe_lang.diagnostics import Diagnostics
 from scribe_lang.errors import ParseError
 from scribe_lang.parser import Parser
 
@@ -156,9 +157,10 @@ def test_invalid_syntax_is_rejected(source):
 
 
 def test_parse_error_reports_filename_line_and_column():
-    with pytest.raises(ParseError) as info:
-        PARSER.parse("if 1 > 0 then\n", "prog.scribe")
-    assert str(info.value).endswith("prog.scribe:1:10")
+    diags = Diagnostics("prog.scribe")
+    assert PARSER.parse("if 1 > 0 then\n", diags) is None
+    (diag,) = diags
+    assert (diag.span.filename, diag.span.line, diag.span.column) == ("prog.scribe", 1, 10)
 
 
 def test_removed_keywords_are_ordinary_identifiers():
@@ -170,3 +172,74 @@ def test_locations_record_where_a_token_ends():
     stmt = parse("x = 1\nprint total\n").statements[1]
     loc = stmt.value.location
     assert (loc.line, loc.column, loc.end_line, loc.end_column) == (2, 7, 2, 12)
+
+
+# -- syntax error wording -----------------------------------------------------
+
+def syntax_errors(source):
+    diags = Diagnostics("t.scribe")
+    assert PARSER.parse(source, diags) is None
+    return [(x.code.code, x.span.line, x.span.column, x.message) for x in diags]
+
+
+@pytest.mark.parametrize("source, expected", [
+    ("x = \n", ("E0101", 1, 5, "unexpected end of line; expected an expression")),
+    ("print 1 2\n", ("E0101", 1, 9, "unexpected number 2; expected an operator or end of line")),
+    ("if 1 > 0 then\n", ("E0101", 1, 10, "unexpected name 'then'; expected an operator or '{'")),
+    ("if x {\n}\n", ("E0101", 1, 6, "unexpected '{'; expected a comparison operator")),
+    ("goto 3\n", ("E0101", 1, 6, "unexpected number 3; expected a name")),
+    ("x = (1 + 2\n", ("E0101", 1, 11, "unexpected end of line; expected ')'")),
+    ("x = 1\n}\n", ("E0101", 2, 1, "unexpected '}'; expected end of file")),
+    ("print 1 print 2\n", ("E0101", 1, 9, "unexpected 'print'; expected an operator or end of line")),
+    ("x = 1 @ 2\n", ("E0102", 1, 7, "unexpected character '@'")),
+    ("print\n", ("E0101", 1, 6, "unexpected end of line; expected an expression or a string")),
+    ("if 1 > 0 {\n    print 1\n\n", ("E0103", 2, 12, "unexpected end of file; expected '}'")),
+])
+def test_syntax_error_messages(source, expected):
+    assert syntax_errors(source) == [expected]
+
+
+def test_syntax_errors_never_mention_grammar_internals():
+    for source in ["x = \n", "}\n", "if 1 > 0 {", "print 1 2", "label\n", "x = = 1\n"]:
+        ((_, _, _, message),) = syntax_errors(source)
+        for internal in ("_NL", "$END", "IDENT", "LPAR", "LBRACE", "Token("):
+            assert internal not in message, (source, message)
+
+
+def test_newline_token_is_underlined_on_its_own_line():
+    diags = Diagnostics("t.scribe")
+    PARSER.parse("x = \nprint 1\n", diags)
+    (diag,) = diags
+    assert (diag.span.line, diag.span.end_line, diag.span.end_column) == (1, 1, 6)
+
+
+def test_parse_without_a_collector_raises_with_the_diagnostics():
+    with pytest.raises(ParseError) as info:
+        PARSER.parse("x = \n")
+    assert [d.code.code for d in info.value.diagnostics] == ["E0101"]
+
+
+@pytest.mark.parametrize("expected, words", [
+    ({"IDENT", "NUMBER", "LPAR", "SIGN"}, "an expression"),
+    ({"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "RBRACE", "_NL"},
+     "a statement, '}' or end of line"),
+    ({"_NL", "SEMICOLON", "$END"}, "end of line"),
+    ({"$END"}, "end of file"),
+    ({"ELSE"}, "'else'"),
+    ({"ADD_OP", "MUL_OP"}, "an operator"),
+    ({"SOME_NEW_TERMINAL"}, "SOME_NEW_TERMINAL"),
+])
+def test_describe_expected(expected, words):
+    from scribe_lang.parser import describe_expected
+
+    assert describe_expected(expected) == words
+
+
+def test_every_grammar_terminal_has_a_readable_name():
+    # Adding a terminal to the grammar without a word for it in parser.py
+    # would leak its internal name into error messages.
+    from scribe_lang.parser import _KEYWORDS, _TERMINAL_WORDS
+
+    terminals = {t.name for t in PARSER._parser.terminals}
+    ignored = {"COMMENT"} | {t for t in terminals if t.startswith("__")}
+    assert terminals - ignored <= set(_TERMINAL_WORDS) | _KEYWORDS

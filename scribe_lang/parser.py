@@ -10,7 +10,10 @@ from .ast import (
     Binary, Block, Comparison, Elif, Goto, Grouped, If, Input, Label, Let,
     Number, Print, Program, SourceLocation, Stmt, Unary, Variable, While,
 )
+from . import diagnostics as codes
+from .diagnostics import Diagnostics, Span
 from .errors import ParseError
+from .render import render_text
 
 
 _GRAMMAR_PATH = Path(__file__).resolve().parent / "grammar" / "scribe_lang.lark"
@@ -152,24 +155,133 @@ class Parser:
             cache=True,
         )
 
-    def parse(self, source: str, filename: str | None = None) -> Program:
+    def parse(self, source: str, diagnostics: Diagnostics | None = None) -> Program | None:
+        """Parse `source`, or report syntax errors and return None.
+
+        Without a `diagnostics` collector, a syntax error raises ParseError
+        (which carries the diagnostics) instead; handy in tests and scripts.
+        """
+        sink = diagnostics if diagnostics is not None else Diagnostics()
         try:
             tree = self._parser.parse(source)
-            return ASTBuilder().transform(tree)
         except UnexpectedInput as exc:
-            where = f"{exc.line}:{exc.column}"
-            if filename:
-                where = f"{filename}:{where}"
-            message = self._format_lark_error(exc)
-            raise ParseError(f"{message} at {where}") from exc
+            _report_syntax_error(exc, sink, source)
+            if diagnostics is None:
+                raise ParseError(render_text(sink, source), sink) from exc
+            return None
+        return ASTBuilder().transform(tree)
 
-    @staticmethod
-    def _format_lark_error(exc: UnexpectedInput) -> str:
-        if isinstance(exc, UnexpectedToken):
-            expected = ", ".join(sorted(exc.expected))
-            if exc.token.type == "$END":
-                return f"unexpected end of input; expected one of: {expected}"
-            return f"unexpected token {exc.token!r}; expected one of: {expected}"
-        if isinstance(exc, UnexpectedCharacters):
-            return f"unexpected character {exc.char!r}"
-        return str(exc)
+
+# -- syntax error wording -----------------------------------------------------
+# Lark speaks in terminal names (`IDENT`, `_NL`, `$END`); users should not have
+# to. Add an entry here when a new terminal is added to the grammar.
+
+_TERMINAL_WORDS = {
+    "_NL": "end of line",
+    "SEMICOLON": "';'",
+    "$END": "end of file",
+    "IDENT": "a name",
+    "NUMBER": "a number",
+    "STRING": "a string",
+    "LBRACE": "'{'",
+    "RBRACE": "'}'",
+    "LPAR": "'('",
+    "RPAR": "')'",
+    "EQUAL": "'='",
+    "COMP_OP": "a comparison operator",
+    "ADD_OP": "an operator",
+    "MUL_OP": "an operator",
+    "SIGN": "'+' or '-'",
+}
+_KEYWORDS = {"PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO"}
+
+# When every terminal of a group is expected, say the group's name instead.
+_GROUPS = [
+    ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE"}),
+    ("an expression", {"NUMBER", "IDENT", "LPAR", "SIGN"}),
+]
+
+
+def _terminal_word(name: str) -> str:
+    if name in _KEYWORDS:
+        return f"'{name.lower()}'"
+    return _TERMINAL_WORDS.get(name, name)
+
+
+def describe_expected(expected: set[str]) -> str:
+    """`{'IDENT', 'NUMBER', 'LPAR', 'SIGN'}` -> "an expression"."""
+    remaining = set(expected)
+    words: list[str] = []
+    for word, group in _GROUPS:
+        if group <= remaining:
+            words.append(word)
+            remaining -= group
+    if "_NL" in remaining:
+        # "end of line" covers both separators, and the end of the file.
+        remaining -= {"SEMICOLON", "$END"}
+    for name in sorted(remaining, key=lambda n: (n.startswith(("_", "$")), n)):
+        word = _terminal_word(name)
+        if word not in words:
+            words.append(word)
+    if len(words) <= 1:
+        return "".join(words)
+    return ", ".join(words[:-1]) + " or " + words[-1]
+
+
+def describe_token(token: Token) -> str:
+    if token.type == "IDENT":
+        return f"name '{token}'"
+    if token.type == "NUMBER":
+        return f"number {token}"
+    if token.type == "STRING":
+        return f"string {token}"
+    if token.type in _KEYWORDS:
+        return f"'{token}'"
+    word = _TERMINAL_WORDS.get(token.type)
+    if word is not None and token.type not in ("COMP_OP", "ADD_OP", "MUL_OP", "SIGN"):
+        return word
+    return f"'{token}'"
+
+
+def _token_span(token: Token, filename: str | None) -> Span:
+    if token.type == "_NL":
+        # A newline token ends on the next line; point at where it starts.
+        return Span(filename, token.line, token.column, token.line, token.column + 1)
+    return Span(filename, token.line, token.column, token.end_line, token.end_column)
+
+
+def _end_of_file(source: str, filename: str | None) -> Span:
+    """Just past the last non-blank character, where the file "ends"."""
+    text = source.rstrip()
+    line = text.count("\n") + 1
+    column = len(text) - (text.rfind("\n") + 1) + 1
+    return Span(filename, line, column)
+
+
+def _expected_terminals(exc: UnexpectedToken) -> set[str]:
+    # LALR merges lookaheads between states, so `exc.expected` can list
+    # terminals that would fail a moment later. `accepts()` tries each one.
+    if exc.interactive_parser is not None:
+        return set(exc.interactive_parser.accepts())
+    return set(exc.expected)
+
+
+def _report_syntax_error(exc: UnexpectedInput, diagnostics: Diagnostics, source: str) -> None:
+    filename = diagnostics.filename
+    if isinstance(exc, UnexpectedToken):
+        expected = describe_expected(_expected_terminals(exc))
+        if exc.token.type == "$END":
+            diagnostics.error(codes.UNEXPECTED_END_OF_FILE, _end_of_file(source, filename), expected=expected)
+        else:
+            diagnostics.error(
+                codes.UNEXPECTED_TOKEN, _token_span(exc.token, filename),
+                found=describe_token(exc.token), expected=expected,
+            )
+    elif isinstance(exc, UnexpectedCharacters):
+        diagnostics.error(
+            codes.UNEXPECTED_CHARACTER,
+            Span(filename, exc.line, exc.column, exc.line, exc.column + 1),
+            char=repr(exc.char),
+        )
+    else:  # pragma: no cover - Lark's LALR parser raises only the two above
+        diagnostics.error(codes.INTERNAL_ERROR, Span(filename, exc.line, exc.column), detail=str(exc))
