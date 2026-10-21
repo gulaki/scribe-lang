@@ -8,8 +8,6 @@ examples/future/  proposals for later versions. They must NOT compile today:
 """
 import pytest
 
-from scribe_lang.errors import CompilerError
-
 from conftest import EXAMPLES
 
 ERROR_EXAMPLES = sorted((EXAMPLES / "errors").glob("*.scribe"))
@@ -21,12 +19,11 @@ def test_error_example_is_rejected_with_the_promised_message(compiler, path):
     source = path.read_text(encoding="utf-8")
     first = source.splitlines()[0]
     assert first.startswith("# expect: "), "first line must be '# expect: <message text>'"
-    with pytest.raises(CompilerError) as info:
-        compiler.compile(source, filename=str(path))
-    assert first.removeprefix("# expect: ") in str(info.value)
+    result = compiler.compile(source, filename=str(path))
+    assert not result.ok
+    assert first.removeprefix("# expect: ") in result.render()
 
 
 @pytest.mark.parametrize("path", FUTURE_EXAMPLES, ids=lambda p: str(p.relative_to(EXAMPLES / "future")))
 def test_future_example_is_not_supported_yet(compiler, path):
-    with pytest.raises(CompilerError):
-        compiler.compile(path.read_text(encoding="utf-8"), filename=str(path))
+    assert not compiler.compile(path.read_text(encoding="utf-8"), filename=str(path)).ok

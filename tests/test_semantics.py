@@ -6,7 +6,6 @@ import pytest
 import scribe_lang
 from scribe_lang.ast import Block, Let, Number, Program
 from scribe_lang.diagnostics import Diagnostics
-from scribe_lang.errors import SemanticError
 from scribe_lang.parser import Parser
 from scribe_lang.semantics import RESERVED_WORDS, SemanticAnalyzer
 
@@ -16,9 +15,9 @@ def names(scope):
 
 
 def error_text(compiler, source):
-    with pytest.raises(SemanticError) as info:
-        compiler.compile(source)
-    return str(info.value)
+    result = compiler.compile(source)
+    assert not result.ok
+    return result.render()
 
 
 # -- scoping ----------------------------------------------------------------

@@ -9,7 +9,7 @@ import pytest
 from scribe_lang.build import BUILD_SYSTEMS, BuildConfig
 from scribe_lang.cli import main
 from scribe_lang.diagnostics import Diagnostics
-from scribe_lang.errors import ParseError, SemanticError
+from scribe_lang.errors import ParseError
 from scribe_lang.parser import Parser
 
 
@@ -49,8 +49,9 @@ def test_number_literals_are_emitted_as_c_float_literals(compiler, literal, expe
 
 
 def test_literal_too_large_for_a_float_is_rejected(compiler):
-    with pytest.raises(SemanticError, match="too large"):
-        compiler.compile("x = " + "9" * 50 + "\n")
+    result = compiler.compile("x = " + "9" * 50 + "\n")
+    assert [d.code.code for d in result.diagnostics] == ["E0401"]
+    assert "too large" in result.diagnostics[0].message
 
 
 def test_largest_float_literal_is_accepted(compiler):
