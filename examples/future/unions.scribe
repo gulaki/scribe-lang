@@ -1,22 +1,22 @@
 # PROPOSAL (v0.6): tagged unions and exhaustive match.
 # A union is a C struct { tag; union { ... } }; the tag is always checked.
 
-type Number = int | float
+type Number = i64 | f64
 
 fn double(n: Number) -> Number {
     match n {
-        int i   => return i * 2
-        float f => return f * 2.0
+        i64 i => return i * 2
+        f64 f => return f * 2.0
     }                          # missing a case would be a compile error
 }
 
-fn parse(text: string) -> int | ParseError {
+fn parse(text: str) -> i64 | ParseError {
     # ...
 }
 
-r := parse("42")
+r = parse("42")
 match r {
-    int i        => print i
+    i64 i        => print i
     ParseError e => print "bad input: " + e.message
 }
 

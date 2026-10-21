@@ -1,4 +1,4 @@
 # PROPOSAL: there is no pointer syntax and no address-of, ever.
 #   error: `&` is not an operator in Scribe
-x: int = 1
-p := &x
+x = 1
+p = &x

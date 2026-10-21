@@ -1,6 +1,7 @@
 # PROPOSAL: ambiguity is an error, never a silent pick.
-#   error: call to `f(int, int)` is ambiguous:
-#   candidates f(float, int) and f(int, float) both need one widening
-fn f(a: float, b: int) -> int { return 1 }
-fn f(a: int, b: float) -> int { return 2 }
-print f(1, 2)
+#   error: call to `f(i32, i32)` is ambiguous:
+#   candidates f(i64, i32) and f(i32, i64) both need one widening
+fn f(a: i64, b: i32) -> i64 { return 1 }
+fn f(a: i32, b: i64) -> i64 { return 2 }
+i32: x, y
+print f(x, y)

@@ -3,30 +3,30 @@
 # analysis and inserts the frees. See docs/design/memory-model.md.
 
 class Account {
-    balance: int
-    owner: string
+    i64: balance                         # fields are declarations
+    str: owner
 
-    fn deposit(mut self, amount: int) {
+    fn deposit(mut self, amount: i64) {
         require amount > 0               # contract: violation traps, never UB
         self.balance = self.balance + amount
     }
 
-    fn describe(self) -> string {
-        return self.owner + ": " + str(self.balance)
+    fn describe(self) -> str {
+        return self.owner + ": " + str(self.balance)   # str(...) is a cast
     }
 }
 
-fn open_for(name: string) -> Account {
-    a := Account(0, name)                # inferred type; escapes via return
+fn open_for(name: str) -> Account {
+    a = Account(0, name)                 # inferred type; escapes via return
     return a                             # moved out: no copy, no free here
 }
 
 fn demo() {
-    tmp := Account(5, "temp")            # does not escape: lives on the stack
+    tmp = Account(5, "temp")             # does not escape: lives on the stack
     tmp.deposit(10)
     print tmp.describe()
 }                                        # tmp cleaned up here, on every path
 
-acct := open_for("ada")                  # heap object owned by acct
+acct = open_for("ada")                   # heap object owned by acct
 acct.deposit(100)
 print acct.describe()

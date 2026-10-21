@@ -1,18 +1,19 @@
 # PROPOSAL (v0.6): overloading on static types. The compiler picks one
 # overload per call site and lowers each to a distinct C function.
 
-fn describe(x: int) -> string   { return "int " + str(x) }
-fn describe(x: float) -> string { return "float " + str(x) }
-fn describe(x: bool) -> string  { return if x { "yes" } else { "no" } }
+fn describe(x: i64) -> str  { return "i64 " + str(x) }
+fn describe(x: f64) -> str  { return "f64 " + str(x) }
+fn describe(x: bool) -> str { return if x { "yes" } else { "no" } }
 
-print describe(3)             # -> describe__int
-print describe(3.5)           # -> describe__float
+print describe(3)             # -> describe__i64
+print describe(3.5)           # -> describe__f64
 print describe(true)          # -> describe__bool
 
-# Resolution: exact match first, then lossless widening (int -> float).
-# Anything still ambiguous is a compile error, never a silent pick.
-fn scale(x: float, k: float) -> float { return x * k }
-fn scale(x: int,   k: int)   -> int   { return x * k }
+# Resolution: exact match first, then lossless widening (f32 -> f64,
+# i32 -> i64; never i64 -> f64). A literal takes whichever type it fits
+# exactly. Anything still ambiguous is a compile error, never a silent pick.
+fn scale(x: f64, k: f64) -> f64 { return x * k }
+fn scale(x: i64, k: i64) -> i64 { return x * k }
 
-print scale(2, 3)             # int version
-print scale(2, 3.0)           # float version via widening of 2
+print scale(2, 3)             # i64 version: exact
+print scale(2, 3.0)           # f64 version: the literal 2 becomes an f64
