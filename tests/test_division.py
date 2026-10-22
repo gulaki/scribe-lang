@@ -179,3 +179,62 @@ def test_float_division_emits_plain_c(compiler):
     c = compiler.compile("f64: a = 7 / 2\n").c_source
     assert "v_a = (7.0 / 2.0);" in c
     assert "scribe_div_i64" not in c
+
+
+# -- hardening ------------------------------------------------------------------------
+
+def test_random_expressions_match_python(build_scribe):
+    """Random `//`, `%`, `+`, `-`, `*` expressions over values near zero and
+    near the limits, built with -Werror and UBSan. Cases whose Python value
+    leaves i64 at any step, or divides by zero, are left out: those stop the
+    program and are tested above."""
+    import random
+
+    from conftest import UBSAN_FLAGS
+
+    rng = random.Random(20261023)
+    values = [INT64_MIN, INT64_MIN + 1, -2**62, -10**9, -97, -8, -3, -2, -1,
+              1, 2, 3, 8, 97, 10**9, 2**62, INT64_MAX - 1, INT64_MAX]
+    ops = ["//", "%", "//", "%", "+", "-", "*"]
+
+    def checked(op, x, y):
+        if op in ("//", "%") and y == 0:
+            raise ArithmeticError
+        z = {"//": x // y if y else 0, "%": x % y if y else 0, "+": x + y, "-": x - y, "*": x * y}[op]
+        if not INT64_MIN <= z <= INT64_MAX:
+            raise ArithmeticError
+        return z
+
+    lines, expected = ["i64: a, b, c"], []
+    while len(expected) < 300:
+        a, b, c = (rng.choice(values) for _ in range(3))
+        op1, op2 = rng.choice(ops), rng.choice(ops)
+        try:
+            # (a op1 b) op2 c, all in checked i64 steps.
+            value = checked(op2, checked(op1, a, b), c)
+        except ArithmeticError:
+            continue
+        lines.append(f"a, b, c = {a}, {b}, {c}")
+        lines.append(f"print (a {op1} b) {op2} c")
+        expected.append(str(value))
+    proc = build_scribe("\n".join(lines) + "\n", [*UBSAN_FLAGS, "-Werror"])("")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.split() == expected
+
+
+@pytest.mark.parametrize("program, message", [
+    ("a = -9223372036854775808\nb = 0\nprint a % b\n", "t.scribe:3:9: runtime error: division by zero\n"),
+    ("a, b, c = 5, -1, 9223372036854775807\nprint a // b + c * 2\n", "t.scribe:2:18: runtime error: integer overflow\n"),
+])
+def test_more_runtime_errors(run_trapping, program, message):
+    assert run_trapping(program) == message
+
+
+def test_guarded_remainder_never_runs(run_trapping_or_output):
+    assert run_trapping_or_output("n = 0\nprint n != 0 and 10 % n == 0\n") == (0, "false\n")
+
+
+@pytest.mark.parametrize("a, b", [(INT64_MAX, 1), (INT64_MAX, -1), (INT64_MIN, 1), (INT64_MIN, 2), (INT64_MIN, INT64_MAX), (INT64_MAX, INT64_MIN)])
+def test_extremes(run_scribe, a, b):
+    out = run_scribe(f"i64: a = {a}, b = {b}\nprint a // b\nprint a % b\n")
+    assert out == f"{a // b}\n{a % b}\n"

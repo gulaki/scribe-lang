@@ -1,14 +1,10 @@
-# Euclid's algorithm by repeated subtraction: if inside while, else branch.
+# Euclid's algorithm: an integer condition, `%` and multiple assignment.
 print "Enter two positive whole numbers:"
 i64: a, b              # declared, so `input` reads whole numbers
 input a
 input b
-while a != b {
-    if a > b {
-        a = a - b
-    } else {
-        b = b - a
-    }
+while b {              # until b is 0
+    a, b = b, a % b    # both values use the old a and b
 }
 print "gcd ="
 print a
