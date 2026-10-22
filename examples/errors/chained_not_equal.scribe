@@ -1,0 +1,5 @@
+# `a != b != c` would not mean that all three differ (1 != 2 != 1 is true),
+# so `!=` cannot be part of a chain.
+# expect: E0507 at 5:9
+a, b, c = 1, 2, 1
+print a != b != c

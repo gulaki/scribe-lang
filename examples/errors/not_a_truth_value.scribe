@@ -1,0 +1,9 @@
+# A condition, and the operands of not/and/or, must be a bool or an integer.
+# A float is not: NaN would count as true. Compare it explicitly: x != 0.0.
+# expect: E0505 at 6:4
+# expect: E0505 at 8:11
+x = 0.5
+if x {
+}
+while not x {
+}

@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from .ast import (
-    Binary, Block, Cast, ChainedLet, Comparison, Declaration, Expr, FloatLit,
-    Goto, Grouped, If, Input, IntLit, Label, Let, MultiLet, Print, Program,
-    SourceLocation, Stmt, Unary, Variable, While,
+    Binary, Block, BoolLit, Cast, ChainedLet, Comparison, ComparisonChain,
+    Declaration, Expr, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let,
+    Logical, MultiLet, Not, Print, Program, SourceLocation, Stmt, Unary,
+    Variable, While,
 )
 from . import diagnostics as codes
 from . import types
@@ -83,10 +84,12 @@ class SemanticModel:
     gotos: list[Goto] = field(default_factory=list)
     # The type of every expression, and the exact value of every integer
     # constant expression, keyed by node identity: expression nodes compare by
-    # value, but two equal literals can end up with different types. For a
-    # Comparison the type is the one both operands are compared in.
+    # value, but two equal literals can end up with different types.
     expr_types: dict[int, ScalarType] = field(default_factory=dict)
     constants: dict[int, int] = field(default_factory=dict)
+    # For a Comparison or ComparisonChain (whose own type is bool): the type
+    # its operands are compared in.
+    operand_types: dict[int, ScalarType] = field(default_factory=dict)
 
     @property
     def symbols(self) -> dict[str, Symbol]:
@@ -99,6 +102,9 @@ class SemanticModel:
     def constant(self, expr: Expr) -> int | None:
         """The folded value if `expr` is an integer constant expression."""
         return self.constants.get(id(expr))
+
+    def operand_type(self, comparison: Expr) -> ScalarType:
+        return self.operand_types[id(comparison)]
 
 
 @dataclass(frozen=True)
@@ -118,6 +124,9 @@ _UNTYPED_FLOAT = _UntypedFloat()
 # What inferring an expression gives: a type, an untyped constant, or None
 # when an error was already reported (so it is not reported again).
 _Info = ScalarType | _Const | _UntypedFloat | None
+
+# Which way each comparison operator points, for chains.
+_DIRECTION = {"<": "up", "<=": "up", ">": "down", ">=": "down", "==": "equal", "!=": "not-equal"}
 
 
 def _fold(op: str, a: int, b: int) -> int | None:
@@ -186,6 +195,14 @@ class SemanticAnalyzer:
       value has to fit (`-9223372036854775808` is fine).
     * A binary operator works in `types.common_type` of its operands, and it
       is an error if there is none: i64 and f64 need an explicit cast.
+    * A truth test (a condition, an operand of `not`/`and`/`or`, `bool(x)`)
+      takes a bool or an integer. A float is an error: NaN would count as
+      true and -0.0 as false, so the program must compare explicitly.
+    * Comparisons, `not`, `and` and `or` give a bool. A bool is not a number:
+      no arithmetic or ordering on it, and no implicit conversion to or from
+      it (`bool(n)` and `i64(flag)` convert explicitly).
+    * `a < b <= c` compares every operand in one common type. A chain points
+      one way (`<`/`<=`, or `>`/`>=`) or is all `==`; `!=` cannot be chained.
 
     Every problem is reported to `diagnostics` and analysis carries on, so all
     errors are found in one run. To avoid a flood of follow-on errors, each
@@ -234,20 +251,26 @@ class SemanticAnalyzer:
             elif isinstance(stmt, Declaration):
                 self._declaration(stmt, scope)
             elif isinstance(stmt, Input):
+                symbol = scope.lookup(stmt.name)
+                if symbol is not None and symbol.type == types.BOOL:
+                    self._diagnostics.error(
+                        codes.CANNOT_INPUT_TYPE, stmt.location, type=symbol.type,
+                        help="read an i64 and convert it: bool(n)",
+                    )
                 self._assign(stmt.name, scope, stmt.location, None, types.F64)
             elif isinstance(stmt, Print):
                 if not stmt.is_string:
                     self._settle_default(stmt.value, self._infer(stmt.value, scope))
             elif isinstance(stmt, If):
-                self._condition(stmt.condition, scope)
+                self._truth(stmt.condition, scope, "a condition")
                 self._visit_block(stmt.body, scope)
                 for arm in stmt.elifs:
-                    self._condition(arm.condition, scope)
+                    self._truth(arm.condition, scope, "a condition")
                     self._visit_block(arm.body, scope)
                 if stmt.orelse is not None:
                     self._visit_block(stmt.orelse, scope)
             elif isinstance(stmt, While):
-                self._condition(stmt.condition, scope)
+                self._truth(stmt.condition, scope, "a condition")
                 self._visit_block(stmt.body, scope)
             elif isinstance(stmt, Block):
                 self._visit_block(stmt, scope)
@@ -334,13 +357,21 @@ class SemanticAnalyzer:
 
     def _check_assignment(self, symbol: Symbol, value: Expr, info: _Info) -> None:
         target = symbol.type
-        if isinstance(info, _Const) or (info is _UNTYPED_FLOAT and target.is_float):
+        numeric = target != types.BOOL
+        if numeric and (isinstance(info, _Const) or (info is _UNTYPED_FLOAT and target.is_float)):
             self._settle(value, target)
             return
-        found = types.DEFAULT_FLOAT if info is _UNTYPED_FLOAT else info
+        if isinstance(info, _Const):
+            found = types.DEFAULT_INT
+        elif info is _UNTYPED_FLOAT:
+            found = types.DEFAULT_FLOAT
+        else:
+            found = info
         if not types.holds_all(found, target):
             help = None
-            if target.is_float or found.is_float:
+            if target == types.BOOL and found.is_float:
+                help = "compare it explicitly, such as x != 0.0"
+            elif target.is_float or found.is_float or types.BOOL in (target, found):
                 help = f"convert it explicitly: {target}(...)"
             self._diagnostics.error(
                 codes.TYPE_MISMATCH, value.location, found=found, name=symbol.name, expected=target,
@@ -373,6 +404,8 @@ class SemanticAnalyzer:
                 self._settle(expr, types.F32)
                 return types.F32
             return _UNTYPED_FLOAT
+        if isinstance(expr, BoolLit):
+            return types.BOOL
         if isinstance(expr, Variable):
             symbol = scope.lookup(expr.name)
             if symbol is not None:
@@ -391,6 +424,9 @@ class SemanticAnalyzer:
             return self._infer(expr.value, scope)
         if isinstance(expr, Unary):
             info = self._infer(expr.operand, scope)
+            if info == types.BOOL:
+                self._diagnostics.error(codes.BOOL_OPERATOR, expr.location, op=expr.operator)
+                return None
             if isinstance(info, _Const) and expr.operator == "-":
                 return _Const(-info.value)
             return info
@@ -398,12 +434,28 @@ class SemanticAnalyzer:
             return self._binary(expr, scope)
         if isinstance(expr, Cast):
             return self._cast(expr, scope)
+        if isinstance(expr, Not):
+            self._truth(expr.operand, scope, "the operand of 'not'")
+            return types.BOOL
+        if isinstance(expr, Logical):
+            self._truth(expr.left, scope, f"the operand of '{expr.operator}'")
+            self._truth(expr.right, scope, f"the operand of '{expr.operator}'")
+            return types.BOOL
+        if isinstance(expr, Comparison):
+            self._compare(expr, [expr.left, expr.right], [expr.operator], [expr.location], scope)
+            return types.BOOL
+        if isinstance(expr, ComparisonChain):
+            self._compare(expr, list(expr.operands), list(expr.operators), list(expr.operator_locations), scope)
+            return types.BOOL
         raise TypeError(f"Unsupported expression node: {type(expr).__name__}")
 
     def _binary(self, expr: Binary, scope: Scope) -> _Info:
         left = self._infer(expr.left, scope)
         right = self._infer(expr.right, scope)
         if left is None or right is None:
+            return None
+        if types.BOOL in (left, right):
+            self._diagnostics.error(codes.BOOL_OPERATOR, expr.operator_location, op=expr.operator)
             return None
         if isinstance(left, _Const) and isinstance(right, _Const):
             value = _fold(expr.operator, left.value, right.value)
@@ -415,22 +467,83 @@ class SemanticAnalyzer:
             return _UNTYPED_FLOAT  # literals only, at least one of them a float
         return self._operand_type(expr, expr.operator_location, left, right)
 
-    def _condition(self, cond: Comparison, scope: Scope) -> None:
-        left = self._infer(cond.left, scope)
-        right = self._infer(cond.right, scope)
-        if left is None or right is None:
+    def _truth(self, expr: Expr, scope: Scope, what: str) -> None:
+        self._truth_test(expr, self._infer(expr, scope), what)
+
+    def _truth_test(self, expr: Expr, info: _Info, what: str) -> None:
+        """Check that `expr` (already inferred as `info`) can be tested for
+        truth: a bool or an integer, never a float."""
+        if isinstance(info, _Const):
+            self._settle(expr, types.DEFAULT_INT)
+        elif info is _UNTYPED_FLOAT or (isinstance(info, ScalarType) and info.is_float):
+            type_ = types.DEFAULT_FLOAT if info is _UNTYPED_FLOAT else info
+            self._diagnostics.error(
+                codes.NOT_A_TRUTH_VALUE, expr.location, what=what, type=type_,
+                help="compare it explicitly, such as x != 0.0",
+            )
+
+    def _compare(self, node: Expr, operands: list[Expr], operators: list[str],
+                 locations: list[SourceLocation], scope: Scope) -> None:
+        """A comparison or a chain: check the operators, then find the one type
+        every operand is compared in (recorded in `operand_types`)."""
+        infos = [self._infer(operand, scope) for operand in operands]
+        directions = [_DIRECTION[op] for op in operators]
+        if "not-equal" in directions and len(operators) > 1:
+            index = directions.index("not-equal")
+            self._diagnostics.error(
+                codes.CHAINED_NOT_EQUAL, locations[index],
+                help="'a != b != c' does not mean all three differ; write the pairs you mean with 'and'",
+            )
             return
-        if not isinstance(left, ScalarType) and not isinstance(right, ScalarType):
-            # Two constants, e.g. `if 1 > 0`: compare them as default types.
-            both_int = isinstance(left, _Const) and isinstance(right, _Const)
-            type_ = types.DEFAULT_INT if both_int else types.DEFAULT_FLOAT
-            self._settle(cond.left, type_)
-            self._settle(cond.right, type_)
-            self._model.expr_types[id(cond)] = type_
+        for op, direction, location in zip(operators, directions, locations):
+            if direction != directions[0]:
+                self._diagnostics.error(
+                    codes.MIXED_COMPARISON_CHAIN, location, first=operators[0], op=op,
+                    help="write the comparisons separately, joined with 'and'",
+                )
+                return
+        if any(info is None for info in infos):
             return
-        type_ = self._operand_type(cond, cond.location, left, right)
-        if type_ is not None:
-            self._model.expr_types[id(cond)] = type_
+        typed = [info for info in infos if isinstance(info, ScalarType)]
+        if types.BOOL in typed:
+            if any(info != types.BOOL for info in infos):
+                other = next(info for info in infos if info != types.BOOL)
+                self._no_common_type(operators[0], locations[0], types.BOOL, self._describe(other),
+                                     help="a bool only compares with another bool, such as 'flag == true'")
+                return
+            for op, location in zip(operators, locations):
+                if op not in ("==", "!="):
+                    self._diagnostics.error(codes.BOOL_OPERATOR, location, op=op)
+                    return
+            self._model.operand_types[id(node)] = types.BOOL
+            return
+        if not typed:
+            # Only constants, e.g. `if 1 > 0`: compare them as default types.
+            all_int = all(isinstance(info, _Const) for info in infos)
+            type_ = types.DEFAULT_INT if all_int else types.DEFAULT_FLOAT
+        else:
+            type_ = typed[0]
+            for other in typed[1:]:
+                joined = types.common_type(type_, other)
+                if joined is None:
+                    self._no_common_type(operators[0], locations[0], type_, other)
+                    return
+                type_ = joined
+        for operand, info in zip(operands, infos):
+            if info is _UNTYPED_FLOAT and not type_.is_float:
+                self._no_common_type(operators[0], locations[0], type_, "a float constant")
+                return
+            if not isinstance(info, ScalarType):
+                self._settle(operand, type_)
+        self._model.operand_types[id(node)] = type_
+
+    @staticmethod
+    def _describe(info: _Info) -> ScalarType | str:
+        if isinstance(info, _Const):
+            return "an integer constant"
+        if info is _UNTYPED_FLOAT:
+            return "a float constant"
+        return info
 
     def _operand_type(self, expr: Binary | Comparison, where: SourceLocation, left: _Info, right: _Info) -> ScalarType | None:
         """The type a binary operator or comparison works in, when at least
@@ -448,20 +561,25 @@ class SemanticAnalyzer:
                              right if right is typed else "a float constant")
         return None
 
-    def _no_common_type(self, op: str, where: SourceLocation, left, right) -> None:
-        """`left` and `right` are types, or the text "a float constant"."""
-        sides = [types.DEFAULT_FLOAT if isinstance(t, str) else t for t in (left, right)]
-        floats = [t for t in sides if t.is_float]
-        ints = [t for t in sides if not t.is_float]
-        help = "convert one side explicitly"
-        if floats and ints:
-            help += f": {floats[0]}(...) to work in {floats[0]}, or {ints[0]}(...) to work in {ints[0]}"
+    def _no_common_type(self, op: str, where: SourceLocation, left, right, help: str | None = None) -> None:
+        """`left` and `right` are types, or text such as "a float constant"."""
+        if help is None:
+            constants = {"a float constant": types.DEFAULT_FLOAT, "an integer constant": types.DEFAULT_INT}
+            sides = [constants.get(t, t) if isinstance(t, str) else t for t in (left, right)]
+            floats = [t for t in sides if t.is_float]
+            ints = [t for t in sides if not t.is_float]
+            help = "convert one side explicitly"
+            if floats and ints:
+                help += f": {floats[0]}(...) to work in {floats[0]}, or {ints[0]}(...) to work in {ints[0]}"
         self._diagnostics.error(codes.NO_COMMON_TYPE, where, op=op, left=left, right=right, help=help)
 
     def _cast(self, expr: Cast, scope: Scope) -> _Info:
         target = types.by_name(expr.type_name)
         info = self._infer(expr.operand, scope)
-        if isinstance(info, _Const):
+        if target == types.BOOL:
+            # bool(n) is the truth test, written out: n != 0.
+            self._truth_test(expr.operand, info, "the operand of bool(...)")
+        elif isinstance(info, _Const):
             # An explicit cast may round an integer constant to a float.
             self._settle(expr.operand, target, exact=False)
         elif info is _UNTYPED_FLOAT:

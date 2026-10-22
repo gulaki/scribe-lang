@@ -510,7 +510,7 @@ class CEmitter:
         # No outer parentheses: comparisons only appear as the condition of
         # `if`/`while`, which already supply them (`if ((a == b))` makes
         # clang warn with -Wparentheses-equality).
-        operand_type = self._model.type_of(cond)
+        operand_type = self._model.operand_type(cond)
         left = self._operand(cond.left, operand_type)
         right = self._operand(cond.right, operand_type)
         return f"{left} {cond.operator} {right}"
