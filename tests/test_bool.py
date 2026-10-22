@@ -141,3 +141,115 @@ def test_a_chain_compares_in_the_common_type_of_all_its_operands(compiler):
 
 def test_undeclared_names_in_logic_do_not_cascade(compiler):
     assert codes(compiler, "if y and not y {\n}\n") == ["E0201"]
+
+
+# -- generated C ---------------------------------------------------------------
+
+def c_source(compiler, source):
+    result = compiler.compile(source)
+    assert result.ok, result.render()
+    return result.c_source
+
+
+@pytest.mark.parametrize("program, fragment", [
+    ("f = true\ng = false\n", "    v_f = 1;\n    v_g = 0;\n"),
+    ("f = true\n", "uint8_t v_f;"),
+    ("bool: f\n", "    v_f = 0;\n"),
+    ("n = 1\nb = not n\n", "v_b = (!v_n);"),
+    ("a, b = true, false\nc = a and b\n", "v_c = (v_a && v_b);"),
+    ("a, b = true, false\nc = a or b\n", "v_c = (v_a || v_b);"),
+    ("a, b, c = true, false, true\nd = a or b or c\n", "v_d = ((v_a || v_b) || v_c);"),
+    ("a, b, c = true, false, true\nd = a and b or c\n", "v_d = ((v_a && v_b) || v_c);"),
+    ("n = 1\nc = n < 2\n", "v_c = (v_n < INT64_C(2));"),
+    ("n = 1\nif n {\n}\n", "    if (v_n != 0) {\n"),
+    ("f = true\nif f {\n}\n", "    if (v_f) {\n"),
+    ("a, b = true, false\nwhile a or b {\n    a = b = false\n}\n", "    while (v_a || v_b) {\n"),
+    ("n = 1\nif not n < 2 {\n}\n", "    if (!(v_n < INT64_C(2))) {\n"),
+    ("while true {\n}\n", "    while (1) {\n"),
+    ("a, b, c = 1, 2, 3\nx = a < b <= c\n", "v_x = ((v_a < v_b) && (v_b <= v_c));"),
+    ("n = 5\nf = bool(n)\n", "v_f = (v_n != 0);"),
+    ("f = true\nn = i64(f)\n", "v_n = ((int64_t)v_f);"),
+    ("f = true\nprint f\n", '    puts(v_f ? "true" : "false");\n'),
+])
+def test_bool_c_shapes(compiler, program, fragment):
+    assert fragment in c_source(compiler, program)
+
+
+def test_bool_needs_stdint(compiler):
+    assert "#include <stdint.h>" in c_source(compiler, "f = true\nprint f\n")
+
+
+def test_chain_middle_is_evaluated_once_through_a_temporary(compiler):
+    source = c_source(compiler, "a, b, c = 1, 2, 3\nx = a < b + 1 < c\n")
+    assert "int64_t t_1 = 0;" in source
+    assert "v_x = ((v_a < (t_1 = scribe_add_i64(v_b, INT64_C(1), 0))) && (t_1 < v_c));" in source
+    assert source.count("scribe_add_i64(v_b") == 1
+
+
+def test_temporaries_are_declared_at_the_top_of_their_block(compiler):
+    source = c_source(compiler, "{\n    a, b, c = 1, 2, 3\n    while a < b + 1 < c {\n        a = 9\n    }\n}\n")
+    block = source[source.index("    {\n"):]
+    assert block.index("int64_t t_1 = 0;") < block.index("while (")
+
+
+def test_conditions_have_no_doubled_parentheses(compiler):
+    source = c_source(compiler, "a, b = true, false\nif a and not b {\n}\nwhile a or b {\n    a = b = false\n}\n")
+    body = source[source.index("int main"):]
+    assert "if (v_a && (!v_b)) {" in body
+    assert "((" not in body
+
+
+# -- behaviour -----------------------------------------------------------------
+
+def test_print_shows_true_and_false(run_scribe):
+    assert run_scribe("print true\nprint false\nprint 1 < 2\nprint not 1\nbool: f\nprint f\n") == (
+        "true\nfalse\ntrue\nfalse\nfalse\n"
+    )
+
+
+def test_integer_conditions(run_scribe):
+    program = 'n = 3\nwhile n {\n    print n\n    n = n - 1\n}\nif not n {\n    print "done"\n}\n'
+    assert run_scribe(program) == "3\n2\n1\ndone\n"
+
+
+def test_casts_between_bool_and_numbers(run_scribe):
+    program = "n = -7\nprint bool(n)\nprint bool(0)\nprint i64(true) + i64(false)\nprint f64(true)\n"
+    assert run_scribe(program) == "true\nfalse\n1\n1.00\n"
+
+
+@pytest.mark.parametrize("program, expected", [
+    # The right side would stop the program with "division by zero".
+    ('n = 0\nif n == 0 or 10 / n > 1 {\n    print "guarded"\n}\n', "guarded\n"),
+    ("n = 0\nprint n != 0 and 10 / n > 1\n", "false\n"),
+    ("a, b, n = true, false, 0\nprint a or (b and 10 / n > 1)\n", "true\n"),
+    ("a, b, n = false, false, 0\nprint a or (b and 10 / n > 1)\n", "false\n"),
+    # A chain stops at the first comparison that fails: x + 1 would overflow.
+    ("x = 9223372036854775807\nprint 1 > 2 > x + 1\n", "false\n"),
+    ("x = 9223372036854775807\nprint 1 > 2 > x + 1 > 0\n", "false\n"),
+])
+def test_short_circuit_skips_the_rest(run_trapping_or_output, program, expected):
+    assert run_trapping_or_output(program) == (0, expected)
+
+
+def test_needed_right_side_is_still_evaluated(run_trapping):
+    assert run_trapping("n = 0\nprint n == 0 and 10 / n > 1\n") == "t.scribe:2:21: runtime error: division by zero\n"
+
+
+def test_truth_table_matches_a_python_reference(run_scribe):
+    # Every allowed form, over a grid of integer values. Python's own `and`,
+    # `or`, `not` and chained comparisons have the same truth values.
+    expressions = [
+        "a < b", "a == b", "not a", "not a == b", "a and b", "a or b",
+        "not a and b or a", "a or b and not a", "(a or b) and not (a and b)",
+        "a < b <= 3", "a >= b > -2", "a == b == 1", "-1 < a - b < 2",
+        "a * b > a + b or a == 0", "not (a < b < 3) and b",
+    ]
+    values = [-2, 0, 1, 3]
+    lines, expected = [], []
+    for a in values:
+        for b in values:
+            lines.append(f"a, b = {a}, {b}")
+            for text in expressions:
+                lines.append(f"print {text}")
+                expected.append("true" if eval(text, {}, {"a": a, "b": b}) else "false")
+    assert run_scribe("\n".join(lines) + "\n").splitlines() == expected
