@@ -253,3 +253,126 @@ def test_truth_table_matches_a_python_reference(run_scribe):
                 lines.append(f"print {text}")
                 expected.append("true" if eval(text, {}, {"a": a, "b": b}) else "false")
     assert run_scribe("\n".join(lines) + "\n").splitlines() == expected
+
+
+# -- hardening -------------------------------------------------------------------
+
+import random  # noqa: E402
+
+from conftest import UBSAN_FLAGS  # noqa: E402
+
+
+def python_value(text, names):
+    """Evaluate a Python version of a Scribe boolean expression. Python's
+    `not`, comparison chains and integer truth have the same truth values;
+    its `and`/`or` return an operand, so the Python text wraps them in
+    bool(...) to match Scribe, where they give a bool."""
+    return "true" if eval(text, {"true": True, "false": False}, dict(names)) else "false"
+
+
+def random_int_expr(rng, depth):
+    if depth == 0 or rng.random() < 0.4:
+        return rng.choice(["a", "b", "c", str(rng.randint(-3, 3))])
+    op = rng.choice(["+", "-", "*"])
+    return f"({random_int_expr(rng, depth - 1)} {op} {random_int_expr(rng, depth - 1)})"
+
+
+def distinct_int_exprs(rng, count):
+    operands = [random_int_expr(rng, 2)]
+    while len(operands) < count:
+        candidate = random_int_expr(rng, 2)
+        if candidate != operands[-1]:
+            operands.append(candidate)
+    return operands
+
+
+def random_bool_expr(rng, depth, top=False):
+    """A random well-typed bool expression (or, unless `top`, an integer
+    used as a truth value), as (Scribe text, Python text)."""
+    leaves = ["p", "q", "true", "false"] + ([] if top else ["a", "b", "c"])
+    kind = "leaf" if depth == 0 else rng.choice(["leaf", "not", "and", "or", "compare", "chain", "equal-bools"])
+    if kind == "leaf":
+        leaf = rng.choice(leaves)
+        return leaf, leaf
+    if kind == "not":
+        scribe, python = random_bool_expr(rng, depth - 1)
+        return f"not ({scribe})", f"not ({python})"
+    if kind in ("and", "or"):
+        (s1, p1), (s2, p2) = random_bool_expr(rng, depth - 1), random_bool_expr(rng, depth - 1)
+        return f"({s1}) {kind} ({s2})", f"bool(({p1}) {kind} ({p2}))"
+    # Neighbouring operands always differ: comparing a value with itself
+    # (`a == a`) is legal Scribe, but clang warns about it (-Wtautological-
+    # compare), and this test builds with -Werror.
+    if kind == "compare":
+        op = rng.choice(["<", "<=", ">", ">=", "==", "!="])
+        text = f" {op} ".join(distinct_int_exprs(rng, 2))
+        return text, text
+    if kind == "chain":
+        ops = rng.choice([["<", "<="], [">", ">="], ["=="]])
+        operands = distinct_int_exprs(rng, rng.randint(3, 4))
+        text = operands[0]
+        for operand in operands[1:]:
+            text += f" {rng.choice(ops)} {operand}"
+        return text, text
+    (s1, p1), (s2, p2) = random_bool_expr(rng, depth - 1, top=True), random_bool_expr(rng, depth - 1, top=True)
+    return f"({s1}) == ({s2})", f"({p1}) == ({p2})"
+
+
+def test_random_boolean_expressions_match_python(build_scribe):
+    rng = random.Random(20261022)  # fixed seed: the same cases every run
+    expressions = [random_bool_expr(rng, 4, top=True) for _ in range(60)]
+    settings = [dict(a=rng.randint(-3, 3), b=rng.randint(-3, 3), c=rng.randint(-3, 3),
+                     p=rng.random() < 0.5, q=rng.random() < 0.5) for _ in range(6)]
+    lines, expected = [], []
+    for names in settings:
+        flags = ", ".join("true" if names[k] else "false" for k in "pq")
+        lines.append(f"a, b, c = {names['a']}, {names['b']}, {names['c']}")
+        lines.append(f"p, q = {flags}")
+        for scribe, python in expressions:
+            lines.append(f"print {scribe}")
+            expected.append(python_value(python, names))
+    # -Werror: the generated C must not draw a single warning; UBSan: no UB.
+    proc = build_scribe("\n".join(lines) + "\n", ["-Werror", *UBSAN_FLAGS])("")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.splitlines() == expected
+
+
+def test_deep_nesting_compiles_cleanly_and_runs(build_scribe):
+    nots = "not " * 40 + "a"
+    ands = "a"
+    for i in range(30):
+        ands = f"(b or ({ands} and c))" if i % 2 else f"({ands} and not b)"
+    source = f"a, b, c = 1, 0, 2\nprint {nots}\nprint {ands}\n"
+    proc = build_scribe(source, ["-Werror", *UBSAN_FLAGS])("")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.splitlines() == [python_value(nots, dict(a=1)), python_value(ands, dict(a=1, b=0, c=2))]
+
+
+def test_several_chains_with_temporaries_in_one_condition(run_scribe, compiler):
+    program = (
+        "a, b, c = 1, 2, 5\n"
+        "if (a < b + 1 < c) and (c > b * 2 >= a) and not (a == b - 1 == c) {\n"
+        '    print "yes"\n'
+        "}\n"
+    )
+    source = compiler.compile(program).c_source
+    assert "int64_t t_1 = 0;" in source and "int64_t t_3 = 0;" in source
+    assert run_scribe(program) == "yes\n"
+
+
+def test_bools_in_assignments_and_declarations(run_scribe):
+    program = (
+        "a, b = 1, 2\n"
+        "p, q = true, false\n"
+        "p, q = q, p\n"                 # a swap of bools goes through temporaries
+        "r = s = a < b\n"               # chained: both bool
+        "bool: t = p or q, u = not t\n"
+        "print p\nprint q\nprint r\nprint s\nprint t\nprint u\n"
+    )
+    assert run_scribe(program) == "false\ntrue\ntrue\ntrue\ntrue\nfalse\n"
+
+
+def test_not_applies_to_a_whole_comparison_or_chain(run_scribe):
+    assert run_scribe("a = 5\nprint not a == 5\nprint not 1 < a < 10\nprint not (a == 5) == false\n") == (
+        "false\nfalse\ntrue\n"
+    )
