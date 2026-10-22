@@ -2,6 +2,14 @@
 
 Goal: no pointers in the language, no lifetimes in the syntax, no leaks, no use-after-free, with cleanup decided by the compiler.
 
+## 0. Scalars (implemented)
+
+`i64`, `f64`, `f32` and `bool` are plain C values (`int64_t`, `double`,
+`float`, `uint8_t`) with no ownership to track. A `bool` takes one byte and
+is always exactly 0 or 1 (see type-system.md, "Booleans"), so a future
+`Array[bool]` is one byte per element with no packing. Generated C that uses
+`bool` or `i64` includes `<stdint.h>`.
+
 ## 1. Value semantics
 
 `struct`, `Array` and `str` behave like values. `b = a` means `b` is independent of `a`. The compiler implements this with a move when `a` is dead afterwards (decided by last-use analysis) and a copy otherwise (optionally copy-on-write for large arrays). Programmers can reason locally: mutation through one name never shows up under another.
@@ -21,7 +29,7 @@ Exclusivity is checked: while a `mut` borrow (or a `for` loop's borrow of its co
 ## 3. Placement and cleanup
 
 - **Escape analysis** decides placement. A value that never leaves its function is stack-allocated (small) or heap-allocated with a frame-owned free (large or growable). A value that is returned, moved into a longer-lived owner or captured gets a heap owner.
-- **Cleanup** is inserted by lowering at every scope exit: fallthrough, `return`, `break`/`continue`, `goto` out of the scope, and a trap path when running inside a destructor-needing frame is not required (a trap exits the process).
+- **Cleanup** is inserted by lowering at every scope exit: fallthrough, `return`, `break`/`continue` and `goto` out of the scope. A trap needs no cleanup, because it ends the process.
 - Lowering uses a cleanup ladder: one `cleanup_N:` label per live owner in reverse order, with exits jumping to the right rung. Straightforward C, no hidden state.
 
 ## 4. Classes and sharing (later)

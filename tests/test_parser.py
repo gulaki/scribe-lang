@@ -144,7 +144,7 @@ REJECTED = {
     "unclosed block": "while 1 > 0 {\n    print 1\n",
     "unopened close brace": "}\n",
     "close brace after a statement": "x = 1 }\n",
-    "condition is not a comparison": "if x {\n}\n",
+    "missing condition": "if {\n}\n",
     "two statements on one line": "x = 1 y = 2\n",
     "statement after a closing brace": "if 1 > 0 { print 1 } print 2\n",
 }
@@ -186,7 +186,7 @@ def syntax_errors(source):
     ("x = \n", ("E0101", 1, 5, "unexpected end of line; expected an expression")),
     ("print 1 2\n", ("E0101", 1, 9, "unexpected number 2; expected an operator or end of line")),
     ("if 1 > 0 then\n", ("E0101", 1, 10, "unexpected name 'then'; expected an operator or '{'")),
-    ("if x {\n}\n", ("E0101", 1, 6, "unexpected '{'; expected a comparison operator")),
+    ("if {\n}\n", ("E0101", 1, 4, "unexpected '{'; expected an expression")),
     ("goto 3\n", ("E0101", 1, 6, "unexpected number 3; expected a name")),
     ("x = (1 + 2\n", ("E0101", 1, 11, "unexpected end of line; expected ')'")),
     ("x = 1\n}\n", ("E0107", 2, 1, "unmatched '}'")),
@@ -221,13 +221,15 @@ def test_parse_without_a_collector_raises_with_the_diagnostics():
 
 
 @pytest.mark.parametrize("expected, words", [
-    ({"IDENT", "INT_LIT", "FLOAT_LIT", "LPAR", "SIGN", "I64", "F32", "F64"}, "an expression"),
-    ({"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "I64", "F32", "F64", "RBRACE", "_NL"},
+    ({"IDENT", "INT_LIT", "FLOAT_LIT", "LPAR", "SIGN", "I64", "F32", "F64", "BOOL", "TRUE", "FALSE", "NOT"},
+     "an expression"),
+    ({"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "I64", "F32", "F64", "BOOL",
+      "RBRACE", "_NL"},
      "a statement, '}' or end of line"),
     ({"_NL", "SEMICOLON", "$END"}, "end of line"),
     ({"$END"}, "end of file"),
     ({"ELSE"}, "'else'"),
-    ({"ADD_OP", "MUL_OP"}, "an operator"),
+    ({"ADD_OP", "MUL_OP", "COMP_OP", "AND", "OR"}, "an operator"),
     ({"SOME_NEW_TERMINAL"}, "SOME_NEW_TERMINAL"),
 ])
 def test_describe_expected(expected, words):
@@ -402,3 +404,92 @@ def test_every_hint_message_still_recovers():
     source = "else {\n}\nprint = 1\nx = \"abc\ny = }\nz = 1 1\n"
     codes = [d.code.code for d in syntax_errors_full(source)]
     assert codes == ["E0105", "E0202", "E0106", "E0107", "E0101"]
+
+
+# -- booleans, logical operators and expression conditions ---------------------
+# Precedence, loosest first: or < and < not < comparison < + - < * / < unary.
+
+from scribe_lang.ast import (  # noqa: E402
+    Binary, BoolLit, Comparison, ComparisonChain, Logical, Not, Unary, Variable,
+)
+
+
+def expr(text):
+    return parse(f"x = {text}\n").statements[0].value
+
+
+def shape(node):
+    """A compact, position-free picture of an expression tree."""
+    if isinstance(node, Variable):
+        return node.name
+    if isinstance(node, BoolLit):
+        return "true" if node.value else "false"
+    if isinstance(node, Not):
+        return ("not", shape(node.operand))
+    if isinstance(node, Logical):
+        return (node.operator, shape(node.left), shape(node.right))
+    if isinstance(node, Comparison):
+        return (node.operator, shape(node.left), shape(node.right))
+    if isinstance(node, ComparisonChain):
+        return ("chain", tuple(node.operators), tuple(shape(o) for o in node.operands))
+    if isinstance(node, Binary):
+        return (node.operator, shape(node.left), shape(node.right))
+    if isinstance(node, Unary):
+        return (node.operator, shape(node.operand))
+    if hasattr(node, "value") and not isinstance(node.value, (int, str)):
+        return shape(node.value)  # Grouped
+    return repr(node)
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("true", "true"),
+    ("false", "false"),
+    ("not a", ("not", "a")),
+    ("not not a", ("not", ("not", "a"))),
+    ("a and b", ("and", "a", "b")),
+    ("a or b", ("or", "a", "b")),
+    # and binds tighter than or, on either side
+    ("a and b or c", ("or", ("and", "a", "b"), "c")),
+    ("a or b and c", ("or", "a", ("and", "b", "c"))),
+    # left-associative
+    ("a and b and c", ("and", ("and", "a", "b"), "c")),
+    ("a or b or c", ("or", ("or", "a", "b"), "c")),
+    # not is looser than comparison (as in Python), tighter than and
+    ("not a == b", ("not", ("==", "a", "b"))),
+    ("not a and b", ("and", ("not", "a"), "b")),
+    ("a and not b", ("and", "a", ("not", "b"))),
+    # comparisons are tighter than and/or, looser than arithmetic
+    ("a < b and c > d", ("and", ("<", "a", "b"), (">", "c", "d"))),
+    ("a + b < c * d", ("<", ("+", "a", "b"), ("*", "c", "d"))),
+    ("-a < b", ("<", ("-", "a"), "b")),
+    # parentheses override
+    ("(a or b) and c", ("and", ("or", "a", "b"), "c")),
+    ("not (a and b)", ("not", ("and", "a", "b"))),
+    # chains
+    ("a < b <= c", ("chain", ("<", "<="), ("a", "b", "c"))),
+    ("a == b == c == d", ("chain", ("==", "==", "=="), ("a", "b", "c", "d"))),
+    ("a < b < c or d", ("or", ("chain", ("<", "<"), ("a", "b", "c")), "d")),
+])
+def test_boolean_expression_shapes(text, expected):
+    assert shape(expr(text)) == expected
+
+
+def test_conditions_are_expressions():
+    program = parse("n = 1\nwhile n {\n}\nif not n {\n} elif n and true {\n}\n")
+    loop, branch = program.statements[1], program.statements[2]
+    assert shape(loop.condition) == "n"
+    assert shape(branch.condition) == ("not", "n")
+    assert shape(branch.elifs[0].condition) == ("and", "n", "true")
+
+
+def test_bool_is_a_type_name():
+    stmt = parse("bool: f = true\n").statements[0]
+    assert stmt.type_name == "bool"
+    assert expr("bool(n)").type_name == "bool"
+
+
+def test_logical_operators_record_their_positions():
+    node = expr("a and b")
+    assert (node.location.line, node.location.column) == (1, 7)
+    chain = expr("a < b < c")
+    assert [(loc.line, loc.column) for loc in chain.operator_locations] == [(1, 7), (1, 11)]

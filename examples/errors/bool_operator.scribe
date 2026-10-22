@@ -1,0 +1,8 @@
+# A bool is not a number: it has no arithmetic and no order.
+# Use i64(flag) to count it, or compare with == and !=.
+# expect: E0506 at 6:12
+# expect: E0506 at 7:9
+flag = true
+print flag + 1
+if flag < false {
+}

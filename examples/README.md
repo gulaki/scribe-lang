@@ -19,7 +19,8 @@ Every feature these programs use is explained in the
 [language reference](../docs/language.md).
 
 Highlights: `types.scribe` (declarations, casts, chained and multiple
-assignment), `fibonacci.scribe` (`a, b = b, a + b`), `primes.scribe` (nested
+assignment), `booleans.scribe` (truth tests, short-circuit `and`/`or`,
+comparison chains), `fibonacci.scribe` (`a, b = b, a + b`), `primes.scribe` (nested
 loops, `goto` as break) and `newton_sqrt.scribe` (float math, early exit,
 block-scoped temporaries).
 

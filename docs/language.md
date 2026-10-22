@@ -50,7 +50,7 @@ the same.
 
 `print` takes a string or a value. A string is printed as written, followed
 by a newline. Its escapes are `\"`, `\\`, `\n`, `\r` and `\t`. Integers print
-as integers and floats with two decimals.
+as integers, floats with two decimals, and bools as `true` or `false`.
 
 ```scribe
 print "100% sure, and \"quoted\""
@@ -72,7 +72,8 @@ inf
 token that is not a valid value of that type reads as 0: text, `4.5` for an
 integer, a number out of range, `nan`, `inf`, or the end of the input. If `x`
 does not exist yet, `input x` creates it as an `f64`. To read a whole number,
-declare it first.
+declare it first. A `bool` cannot be read: read an `i64`, check it, and
+convert it with `bool(n)`.
 
 ```scribe
 # stdin: 42\n2.5\nhello
@@ -239,6 +240,7 @@ print x
 | `i64` | 64-bit signed integer. Arithmetic is checked: overflow stops the program. |
 | `f64` | 64-bit IEEE 754 float. |
 | `f32` | 32-bit IEEE 754 float. |
+| `bool` | `true` or `false`. See [Booleans](#booleans). |
 
 ### Literals
 
@@ -299,7 +301,7 @@ print n * x
 
 ### Casts
 
-A cast is written like a call: `i64(x)`, `f64(n)`, `f32(x)`.
+A cast is written like a call: `i64(x)`, `f64(n)`, `f32(x)`, `bool(n)`.
 
 | Cast | Result |
 |---|---|
@@ -307,6 +309,8 @@ A cast is written like a call: `i64(x)`, `f64(n)`, `f32(x)`.
 | `f64(x)` from an `f32` | exact |
 | `f32(x)` from an `f64` | the nearest `f32`; out of range gives ±inf |
 | `i64(x)` from a float | truncated toward zero; NaN or out of range stops the program |
+| `bool(n)` from an integer | `n != 0`; from a float it is an error (E0505) |
+| `i64(flag)`, `f64(flag)`, `f32(flag)` from a bool | 0 or 1 |
 
 ```scribe
 n = 3
@@ -322,21 +326,161 @@ print i64(-2.75)
 -2
 ```
 
+## Booleans
+
+`true` and `false` are the two `bool` values. Comparisons give a `bool`, so
+`flag = a < b` makes `flag` a bool, and so do `not`, `and` and `or`.
+
+```scribe
+n = 7
+small = n < 10
+print small
+print not small
+print n > 0 and n < 10
+print n < 0 or n == 7
+```
+
+```output
+true
+false
+true
+true
+```
+
+### Truth tests
+
+A condition of `if`, `elif` or `while`, and each operand of `not`, `and` and
+`or`, must be a `bool` or an integer. An integer counts as true when it is not
+0, so `while n {` loops until `n` reaches 0.
+
+```scribe
+n = 3
+while n {
+    print n
+    n = n - 1
+}
+```
+
+```output
+3
+2
+1
+```
+
+A float is not a truth value, because a float `x` can be NaN, which is not
+zero, or `-0.0`, which is. Compare it explicitly instead: `x != 0.0`.
+
+```scribe-error
+# expect: E0505 at 3:4
+x = 0.5
+if x {
+}
+```
+
+### `and` and `or` stop early
+
+`and` and `or` give a `bool` and stop as soon as the answer is known: `a and
+b` does not evaluate `b` when `a` is false, and `a or b` does not evaluate
+`b` when `a` is true. So a test can guard a check that would stop the
+program:
+
+```scribe
+n = 0
+if n == 0 or 10 / n > 1 {
+    print "safe"
+}
+print n != 0 and 10 / n > 1
+```
+
+```output
+safe
+false
+```
+
+`not` binds more loosely than a comparison, as in Python, so `not a == b`
+means `not (a == b)`. `and` binds more tightly than `or`.
+
+### Comparison chains
+
+`a < b <= c` means `a < b and b <= c`, with `b` evaluated only once. A chain
+points one way, all `<`/`<=` or all `>`/`>=`, or is all `==`. Its operands are
+compared in one common type.
+
+```scribe
+low, x, high = 1, 5, 10
+print low <= x < high
+print low == x == high
+print 10 > x >= 5 > low
+```
+
+```output
+true
+false
+true
+```
+
+`!=` cannot be chained, because `a != b != c` would not mean that all three
+differ: `1 != 2 != 1` is true in Python. A chain that changes direction, such
+as `a < b > c`, is an error too.
+
+```scribe-error
+# expect: E0507 at 4:9
+# expect: E0508 at 5:13
+a, b, c = 1, 2, 1
+print a != b != c
+print a < b > c
+```
+
+### A bool is not a number
+
+A `bool` has no arithmetic and no order, and nothing converts to or from it
+implicitly. `bool(n)` tests an integer (`n != 0`), and `i64(flag)`,
+`f64(flag)` or `f32(flag)` give 0 or 1. Two bools compare with `==` and `!=`.
+
+```scribe
+flag = true
+count = i64(flag) + i64(false)
+print count
+print bool(-7)
+print flag == true
+```
+
+```output
+1
+true
+true
+```
+
+```scribe-error
+# expect: E0506 at 5:12
+# expect: E0501 at 6:15
+# expect: E0509 at 7:1
+flag = true
+print flag + 1
+bool: ready = 1
+input flag
+```
+
 ## Operators
 
 From tightest to loosest:
 
-1. `( ... )`, casts
-2. unary `-` and `+`
-3. `*` `/`
-4. `+` `-`
-5. comparisons `==` `!=` `<` `<=` `>` `>=`, only as the condition of `if`,
-   `elif` and `while`
+1. unary `-` and `+`
+2. `*` `/`
+3. `+` `-`
+4. comparisons and chains: `==` `!=` `<` `<=` `>` `>=`
+5. `not`
+6. `and`
+7. `or`
+
+`*`, `/`, `+`, `-`, `and` and `or` group from the left. Parentheses group
+explicitly. A value can have only one sign, so write `-(-x)`, not `- -x`.
 
 ## Control flow
 
 `if`/`elif`/`else` runs the first branch whose condition holds. `while`
-repeats its body while its condition holds. A bare `{ ... }` is just a scope.
+repeats its body while its condition holds. A condition is a `bool` or an
+integer (see [Truth tests](#truth-tests)). A bare `{ ... }` is just a scope.
 
 ```scribe
 score = 85
@@ -393,17 +537,16 @@ Compile-time errors are listed in [errors.md](errors.md).
 ## Reserved words
 
 These cannot be used as names: `print`, `input`, `if`, `elif`, `else`,
-`while`, `label`, `goto`, and the type names `i8`, `i16`, `i32`, `i64`, `u8`,
-`u16`, `u32`, `u64`, `f16`, `f32`, `f64`, `f128`, `bool`, `char`, `byte` and
-`str`. Only `i64`, `f64` and `f32` are usable types so far; the others are
-reserved for later.
+`while`, `label`, `goto`, `true`, `false`, `and`, `or`, `not`, and the type
+names `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f16`, `f32`,
+`f64`, `f128`, `bool`, `char`, `byte` and `str`. Only `i64`, `f64`, `f32` and
+`bool` are usable types so far; the others are reserved for later.
 
 ## Not available yet
 
 | Feature | Plan |
 |---|---|
-| A condition that is not a comparison (`while n {`), `bool`, `true`/`false`, `and`/`or`/`not` | [next steps](design/type-system.md#status-and-next-steps), task 2 |
-| `i8` ... `i32`, `u8` ... `u64` (`char` and `byte` are `u8`) | task 3 |
+| `i8` ... `i32`, `u8` ... `u64` (`char` and `byte` are `u8`) | [next steps](design/type-system.md#status-and-next-steps), task 3 |
 | `**` | task 6 |
 | `f16`, `f128` | task 7 |
 | `%`, wrapping operators (`+%`) | [type-system.md](design/type-system.md#runtime-checks) |
@@ -416,5 +559,8 @@ becomes `l_top`, so no Scribe name can clash with C. Program-level variables
 are zero-initialised globals. A variable from a block is declared, set to
 zero, at the top of that C block, so a `goto` can never skip its declaration.
 Integer arithmetic calls small checked helpers such as `scribe_add_i64`,
-emitted only when a program uses them. The C compiles cleanly with
-`cc -std=c11 -pedantic-errors -Wall -Wextra`.
+emitted only when a program uses them. A `bool` is a `uint8_t` that is
+always 0 or 1, and `and`/`or` become C's `&&` and `||`. The C builds with
+`cc -std=c11 -pedantic-errors -Wall -Wextra`. One known exception to a
+warning-free build: comparing a variable with itself (`a == a`) makes clang
+warn that the result is always the same.

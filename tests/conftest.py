@@ -99,3 +99,15 @@ def run_trapping(build_scribe):
         return proc.stderr
 
     return run
+
+
+@pytest.fixture
+def run_trapping_or_output(build_scribe):
+    """Build with UBSan and run; returns (exit status, stdout). For checking
+    that a program finishes without reaching a runtime error it guards."""
+
+    def run(source: str, stdin: str = "") -> tuple[int, str]:
+        proc = build_scribe(source, UBSAN_FLAGS)(stdin)
+        return proc.returncode, proc.stdout
+
+    return run

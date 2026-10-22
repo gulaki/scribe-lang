@@ -58,7 +58,10 @@ F16 = ScalarType("f16", "float", 16, "_Float16", mantissa=11, max_exponent=15)
 F32 = ScalarType("f32", "float", 32, "float", mantissa=24, max_exponent=127)
 F64 = ScalarType("f64", "float", 64, "double", mantissa=53, max_exponent=1023)
 F128 = ScalarType("f128", "float", 128, "_Float128", mantissa=113, max_exponent=16383)
-BOOL = ScalarType("bool", "bool", 1, "bool")
+# Stored as one byte that is always exactly 0 or 1 (never _Bool, so a bool
+# array will be one byte per element and its C type is spelled the same
+# everywhere).
+BOOL = ScalarType("bool", "bool", 1, "uint8_t")
 
 # Smallest first: `common_type` picks the first entry that holds both operands.
 NUMERIC = (I8, U8, I16, U16, F16, I32, U32, F32, I64, U64, F64, F128)
@@ -70,8 +73,8 @@ _BY_NAME.update({"char": U8, "byte": U8})
 # (`str` arrives with arrays), so programs written today keep working later.
 TYPE_NAMES = frozenset(_BY_NAME) | {"str"}
 
-# Types a program can name today (in a cast).
-SUPPORTED = (I64, F32, F64)
+# Types a program can name today (in a declaration or a cast).
+SUPPORTED = (I64, F32, F64, BOOL)
 
 # The type of a literal that nothing else gives a type to.
 DEFAULT_INT = I64

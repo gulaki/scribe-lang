@@ -20,7 +20,7 @@ All generated names are deterministic and readable.
 |---|---|
 | variable `x` | `v_x` (Scribe has no shadowing, so never a suffix) — done |
 | label `top` | `l_top` — done |
-| temporaries | `t_1`, `t_2`, ... — done, per program for now (multiple assignment); per function later |
+| temporaries | `t_1`, `t_2`, ... — done (multiple assignment, comparison chains), numbered per program for now; per function later |
 | runtime helpers | `scribe_add_i64`, `scribe_trap`, `scribe_read_f64`, ... — done |
 | function `gcd(i64,i64)` | `f_gcd__i64_i64` |
 | overload `describe(f64)` | `f_describe__f64` |
@@ -51,6 +51,29 @@ static inline @T@ @Array@__get(const @Array@ *a, int64_t i) {
 ## Monomorphisation
 
 User generics are instantiated in the IR: collect reachable `(function, type-args)` pairs from `main`, clone and substitute, name via the table above, deduplicate. Errors are reported against the generic definition (constraints are checked once, not per instantiation). Recursion in instantiation (`f[T]` calling `f[Array[T]]`) gets a depth limit and an error.
+
+## Booleans and conditions (implemented)
+
+| Scribe | C |
+|---|---|
+| `bool` | `uint8_t` (`<stdint.h>`); every stored value is 0 or 1 |
+| `true`, `false` | `1`, `0`: plain constants, so `while true` is a C constant expression |
+| `not a` | `(!a)` |
+| `a and b`, `a or b` | `(a && b)`, `(a \|\| b)`: C evaluates `b` only if needed, and gives 0 or 1 |
+| `a < b` as a value | `(v_a < v_b)` |
+| `if a < b` | `if (v_a < v_b)`: no doubled parentheses (clang warns on `if ((a == b))`) |
+| `if flag`, `if n` | `if (v_flag)`, `if (v_n != 0)` |
+| `a < b <= c` | `((v_a < v_b) && (v_b <= v_c))` |
+| `a < b + 1 <= c` | `((v_a < (t_1 = scribe_add_i64(v_b, INT64_C(1), 0))) && (t_1 <= v_c))`: a middle operand that is not a name or constant is evaluated once, at its first use |
+| `bool(n)` | `(v_n != 0)` |
+| `i64(flag)` | `((int64_t)v_flag)` |
+| `print flag` | `puts(v_flag ? "true" : "false");` |
+
+An expression temporary such as `t_1` is declared, set to 0, at the top of
+the enclosing C block, next to the hoisted variables, and assigned inside the
+expression. That works in a `while` condition and in an `elif` chain, and a
+`goto` can never skip the declaration. (Multiple assignment, whose values are
+whole statements, puts its temporaries in a C block of its own instead.)
 
 ## Shape of emitted code
 

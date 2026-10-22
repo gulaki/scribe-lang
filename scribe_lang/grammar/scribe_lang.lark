@@ -38,8 +38,9 @@ decl_stmt: type_name ":" declarator ("," declarator)*
 declarator: IDENT ("=" expression)?
 
 // `}` and the next `elif` / `else` must be on the same line (K&R style).
-if_stmt: IF comparison block (ELIF comparison block)* (ELSE block)?
-while_stmt: WHILE comparison block
+// A condition is any expression; semantics requires a bool or an integer.
+if_stmt: IF expression block (ELIF expression block)* (ELSE block)?
+while_stmt: WHILE expression block
 
 // A block is a scope. LBRACE/RBRACE are named so their positions survive into
 // the parse tree and can be attached to AST nodes.
@@ -48,20 +49,30 @@ block: LBRACE _sep? _stmt_list? RBRACE
 label_stmt: LABEL IDENT
 goto_stmt: GOTO IDENT
 
-comparison: expression COMP_OP expression
-
-?expression: term (ADD_OP term)*
+// Precedence, loosest first, as in Python:
+//   or < and < not < comparisons < + - < * / < unary - +
+// `and` and `or` are left-associative. `a < b <= c` is one chained
+// comparison, meaning `a < b and b <= c`.
+?expression: or_expr
+?or_expr: and_expr (OR and_expr)*
+?and_expr: not_expr (AND not_expr)*
+?not_expr: NOT not_expr
+         | comparison
+?comparison: sum (COMP_OP sum)*
+?sum: term (ADD_OP term)*
 ?term: unary (MUL_OP unary)*
 ?unary: SIGN? primary
 ?primary: INT_LIT       -> int_literal
         | FLOAT_LIT     -> float_literal
+        | TRUE          -> true_literal
+        | FALSE         -> false_literal
         | IDENT         -> variable
         | "(" expression ")" -> grouped
         | type_name "(" expression ")" -> cast
 
 // A cast is written like a call: `f64(n)`. Only these types can be named
 // today (in casts and declarations); see the reserved type names below.
-type_name: I64 | F32 | F64
+type_name: I64 | F32 | F64 | BOOL
 
 ADD_OP: "+" | "-"
 MUL_OP: "*" | "/"
@@ -84,6 +95,11 @@ ELSE: "else"
 WHILE: "while"
 LABEL: "label"
 GOTO: "goto"
+TRUE: "true"
+FALSE: "false"
+AND: "and"
+OR: "or"
+NOT: "not"
 
 // Type names. All of them are reserved now, including ones the language does
 // not support yet, so a program that uses one as a variable name today does

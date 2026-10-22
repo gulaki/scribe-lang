@@ -83,6 +83,13 @@ CONSTANT_OVERFLOW = _register("E0503", "constant-overflow", "constant expression
 CONSTANT_DIVISION_BY_ZERO = _register(
     "E0504", "constant-division-by-zero", "division by zero in a constant expression",
 )
+NOT_A_TRUTH_VALUE = _register("E0505", "not-a-truth-value", "{what} must be a bool or an integer, not {type}")
+BOOL_OPERATOR = _register("E0506", "bool-operator", "'{op}' does not work on bool")
+CHAINED_NOT_EQUAL = _register("E0507", "chained-not-equal", "'!=' cannot be part of a comparison chain")
+MIXED_COMPARISON_CHAIN = _register(
+    "E0508", "mixed-comparison-chain", "a comparison chain cannot mix '{first}' and '{op}'",
+)
+CANNOT_INPUT_TYPE = _register("E0509", "cannot-input-type", "'input' cannot read a {type}")
 
 ASSIGNMENT_COUNT_MISMATCH = _register(
     "E0601", "assignment-count-mismatch", "assignment has {targets} but {values}",

@@ -1,0 +1,4 @@
+# A comparison chain points one way: all `<`/`<=`, all `>`/`>=`, or all `==`.
+# expect: E0508 at 4:15
+low, x, high = 1, 5, 3
+print low < x > high

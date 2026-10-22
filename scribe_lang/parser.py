@@ -8,9 +8,10 @@ from lark import Lark, Transformer, Token
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 from .ast import (
-    Binary, Block, Cast, ChainedLet, Comparison, Declaration, Declarator,
-    Elif, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let, MultiLet,
-    Print, Program, SourceLocation, Stmt, Unary, Variable, While,
+    Binary, Block, BoolLit, Cast, ChainedLet, Comparison, ComparisonChain,
+    Declaration, Declarator, Elif, FloatLit, Goto, Grouped, If, Input, IntLit,
+    Label, Let, Logical, MultiLet, Not, Print, Program, SourceLocation, Stmt,
+    Unary, Variable, While,
 )
 from . import diagnostics as codes
 from .diagnostics import Diagnostics, Span
@@ -116,9 +117,23 @@ class ASTBuilder(Transformer):
         return Goto(str(items[1]), _loc(items[0]))
 
     def comparison(self, items):
-        return Comparison(items[0], str(items[1]), items[2], _loc(items[1]))
+        operands = tuple(items[0::2])
+        operators = items[1::2]
+        if len(operators) == 1:
+            return Comparison(operands[0], str(operators[0]), operands[1], _loc(operators[0]))
+        locations = tuple(_loc(op) for op in operators)
+        return ComparisonChain(operands, tuple(str(op) for op in operators), locations, locations[0])
 
-    def expression(self, items):
+    def or_expr(self, items):
+        return _fold_logical(items)
+
+    def and_expr(self, items):
+        return _fold_logical(items)
+
+    def not_expr(self, items):
+        return Not(items[1], _loc(items[0]))
+
+    def sum(self, items):
         return _fold_binary(items)
 
     def term(self, items):
@@ -144,6 +159,12 @@ class ASTBuilder(Transformer):
     def cast(self, items):
         type_token, operand = items
         return Cast(str(type_token), operand, _loc(type_token))
+
+    def true_literal(self, items):
+        return BoolLit(True, _loc(items[0]))
+
+    def false_literal(self, items):
+        return BoolLit(False, _loc(items[0]))
 
     def variable(self, items):
         return Variable(str(items[0]), _loc(items[0]))
@@ -171,6 +192,14 @@ def _fold_binary(items):
         op = items[i]
         rhs = items[i + 1]
         node = Binary(node, str(op), rhs, getattr(node, "location", SourceLocation()), _loc(op))
+    return node
+
+
+def _fold_logical(items):
+    """`a and b and c` -> ((a and b) and c), located at each operator."""
+    node = items[0]
+    for i in range(1, len(items), 2):
+        node = Logical(node, str(items[i]), items[i + 1], _loc(items[i]))
     return node
 
 
@@ -322,12 +351,18 @@ _TERMINAL_WORDS = {
     "MUL_OP": "an operator",
     "SIGN": "'+' or '-'",
 }
-_KEYWORDS = {"PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO", "I64", "F32", "F64"}
+_KEYWORDS = {
+    "PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO",
+    "I64", "F32", "F64", "BOOL", "TRUE", "FALSE", "AND", "OR", "NOT",
+}
 
 # When every terminal of a group is expected, say the group's name instead.
 _GROUPS = [
-    ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "I64", "F32", "F64"}),
-    ("an expression", {"INT_LIT", "FLOAT_LIT", "IDENT", "LPAR", "SIGN", "I64", "F32", "F64"}),
+    ("an operator", {"ADD_OP", "MUL_OP", "COMP_OP", "AND", "OR"}),
+    ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "I64", "F32", "F64", "BOOL"}),
+    ("an expression", {
+        "INT_LIT", "FLOAT_LIT", "IDENT", "LPAR", "SIGN", "I64", "F32", "F64", "BOOL", "TRUE", "FALSE", "NOT",
+    }),
 ]
 
 

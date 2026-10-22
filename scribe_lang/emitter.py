@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from .ast import (
-    Binary, Block, Cast, ChainedLet, Comparison, Declaration, Expr, FloatLit,
-    Goto, Grouped, If, Input, Label, Let, MultiLet, Print, Program,
-    SourceLocation, Unary, Variable, While,
+    Binary, Block, BoolLit, Cast, ChainedLet, Comparison, ComparisonChain,
+    Declaration, Expr, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let,
+    Logical, MultiLet, Not, Print, Program, SourceLocation, Unary, Variable,
+    While,
 )
 from . import types
 from .semantics import Scope, SemanticModel
@@ -297,13 +298,27 @@ def _variables(expr: Expr):
         yield expr.name
     elif isinstance(expr, Grouped):
         yield from _variables(expr.value)
-    elif isinstance(expr, Unary):
+    elif isinstance(expr, (Unary, Cast, Not)):
         yield from _variables(expr.operand)
-    elif isinstance(expr, Cast):
-        yield from _variables(expr.operand)
-    elif isinstance(expr, (Binary, Comparison)):
+    elif isinstance(expr, (Binary, Comparison, Logical)):
         yield from _variables(expr.left)
         yield from _variables(expr.right)
+    elif isinstance(expr, ComparisonChain):
+        for operand in expr.operands:
+            yield from _variables(operand)
+
+
+def _without_outer_parentheses(text: str) -> str:
+    """`(a && b)` -> `a && b`, but `(a) && (b)` stays as it is. For conditions,
+    whose parentheses `if (...)` already supplies."""
+    if not (text.startswith("(") and text.endswith(")")):
+        return text
+    depth = 0
+    for i, char in enumerate(text):
+        depth += {"(": 1, ")": -1}.get(char, 0)
+        if depth == 0 and i < len(text) - 1:
+            return text
+    return text[1:-1]
 
 
 _CHECKED_I64 = {"+": "scribe_add_i64", "-": "scribe_sub_i64", "*": "scribe_mul_i64", "/": "scribe_div_i64"}
@@ -339,6 +354,8 @@ class CEmitter:
     _helpers: set[str] = field(default_factory=set, init=False)
     _sites: list[str] = field(default_factory=list, init=False)
     _temporaries: int = field(default=0, init=False)
+    # Declarations of the expression temporaries each open C block needs.
+    _block_temporaries: list[list[str]] = field(default_factory=list, init=False)
 
     def emit_program(self, program: Program, model: SemanticModel) -> str:
         self._body = []
@@ -353,8 +370,11 @@ class CEmitter:
         globals_ = [f"{self._c_type(symbol.type)} {c_variable(name)};" for name, symbol in sorted(model.root.symbols.items())]
 
         self._body.append("int main(void) {")
+        self._block_temporaries = [[]]
+        start = len(self._body)
         for stmt in program.statements:
             self._stmt(stmt)
+        self._body[start:start] = [" " * self.indent_width + d for d in self._block_temporaries.pop()]
         self._body.append("    return 0;")
         self._body.append("}")
 
@@ -395,9 +415,17 @@ class CEmitter:
         return len(self._sites) - 1
 
     def _c_type(self, t: ScalarType) -> str:
-        if t.is_integer:
+        if t.is_integer or t == types.BOOL:
             self._includes.add("stdint.h")
         return t.c_name
+
+    def _temporary(self, t: ScalarType) -> str:
+        """A new temporary for use inside an expression. It is declared, zeroed,
+        at the top of the enclosing C block, so a goto never skips it."""
+        self._temporaries += 1
+        name = f"t_{self._temporaries}"
+        self._block_temporaries[-1].append(f"{self._c_type(t)} {name} = 0;")
+        return name
 
     def _line(self, text: str) -> None:
         self._body.append(" " * (self._indent * self.indent_width) + text)
@@ -413,8 +441,12 @@ class CEmitter:
         self._indent += 1
         for name, symbol in scope.symbols.items():
             self._line(f"{self._c_type(symbol.type)} {c_variable(name)} = 0;")
+        self._block_temporaries.append([])
+        start = len(self._body)
         for child in block.statements:
             self._stmt(child)
+        indent = " " * (self._indent * self.indent_width)
+        self._body[start:start] = [indent + d for d in self._block_temporaries.pop()]
         self._indent -= 1
         self._scopes.pop()
 
@@ -424,6 +456,8 @@ class CEmitter:
                 # puts, not printf: the text must never be read as a format
                 # string (`print "100%"`). puts also appends the newline.
                 self._line(f"puts({c_string_literal(stmt.value)});")
+            elif self._model.type_of(stmt.value) == types.BOOL:
+                self._line(f'puts({self._expr(stmt.value)} ? "true" : "false");')
             elif self._model.type_of(stmt.value).is_integer:
                 self._includes.add("inttypes.h")
                 self._line(f'printf("%" PRId64 "\\n", {self._expr(stmt.value)});')
@@ -506,16 +540,55 @@ class CEmitter:
         self._indent -= 1
         self._line("}")
 
-    def _condition(self, cond: Comparison) -> str:
-        # No outer parentheses: comparisons only appear as the condition of
-        # `if`/`while`, which already supply them (`if ((a == b))` makes
-        # clang warn with -Wparentheses-equality).
-        operand_type = self._model.type_of(cond)
-        left = self._operand(cond.left, operand_type)
-        right = self._operand(cond.right, operand_type)
-        return f"{left} {cond.operator} {right}"
+    def _condition(self, cond: Expr) -> str:
+        """The C condition of an `if`/`elif`/`while`: a bool as it is, an
+        integer compared with 0. No outer parentheses, because `if (...)`
+        supplies them (`if ((a == b))` makes clang warn)."""
+        if isinstance(cond, Comparison):
+            return self._comparison(cond)
+        text = self._expr(cond)
+        if self._model.type_of(cond).is_integer:
+            return f"{text} != 0"
+        return _without_outer_parentheses(text)
+
+    def _comparison(self, cmp: Comparison) -> str:
+        operand_type = self._model.operand_type(cmp)
+        left = self._operand(cmp.left, operand_type)
+        right = self._operand(cmp.right, operand_type)
+        return f"{left} {cmp.operator} {right}"
+
+    def _chain(self, chain: ComparisonChain) -> str:
+        """`a < b <= c` -> `((a < b) && (b <= c))`. A middle operand that is
+        not a plain name or constant is evaluated once, into a temporary, at
+        its first use: `((a < (t_1 = b + 1)) && (t_1 <= c))`. So, as in
+        Python, later operands only run while the comparisons hold."""
+        operand_type = self._model.operand_type(chain)
+        last = len(chain.operands) - 1
+        first_use, later_use = [], []
+        for i, operand in enumerate(chain.operands):
+            text = self._operand(operand, operand_type)
+            if 0 < i < last and not self._is_plain(operand):
+                temporary = self._temporary(operand_type)
+                first_use.append(f"({temporary} = {text})")
+                later_use.append(temporary)
+            else:
+                first_use.append(text)
+                later_use.append(text)
+        pieces = [
+            f"({first_use[0] if i == 0 else later_use[i]} {op} {first_use[i + 1]})"
+            for i, op in enumerate(chain.operators)
+        ]
+        return "(" + " && ".join(pieces) + ")"
+
+    def _is_plain(self, expr: Expr) -> bool:
+        """True if evaluating `expr` twice costs nothing and cannot fail."""
+        if isinstance(expr, Grouped):
+            return self._is_plain(expr.value)
+        return isinstance(expr, (Variable, IntLit, FloatLit, BoolLit)) or self._model.constant(expr) is not None
 
     def _zero(self, t: ScalarType) -> str:
+        if t == types.BOOL:
+            return "0"
         if t.is_float:
             return c_float_literal(Fraction(0), t)
         self._c_type(t)
@@ -559,6 +632,20 @@ class CEmitter:
             return f"({left} {expr.operator} {right})"
         if isinstance(expr, Cast):
             return self._cast(expr, t)
+        if isinstance(expr, BoolLit):
+            # Plain constants, so `while true` stays a C constant expression.
+            return "1" if expr.value else "0"
+        if isinstance(expr, Not):
+            return f"(!{self._expr(expr.operand)})"
+        if isinstance(expr, Logical):
+            # C's && and || evaluate the right side only when needed, and give
+            # 0 or 1, so a bool stored from them is always 0 or 1.
+            op = "&&" if expr.operator == "and" else "||"
+            return f"({self._expr(expr.left)} {op} {self._expr(expr.right)})"
+        if isinstance(expr, Comparison):
+            return f"({self._comparison(expr)})"
+        if isinstance(expr, ComparisonChain):
+            return self._chain(expr)
         raise TypeError(f"Unsupported expression node: {type(expr).__name__}")
 
     def _cast(self, expr: Cast, target: ScalarType) -> str:
@@ -566,6 +653,10 @@ class CEmitter:
         operand = self._expr(expr.operand)
         if source == target:
             return operand
+        if target == types.BOOL:
+            return f"({operand} != 0)"
+        if source == types.BOOL:
+            return f"(({self._c_type(target)}){operand})"  # 0 or 1, exact in every type
         if target.is_float and (source.is_integer or types.holds_all(source, target)):
             # Integer -> float rounds (defined: every i64 is in range of f32);
             # f32 -> f64 is exact.

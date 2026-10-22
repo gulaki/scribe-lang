@@ -1,0 +1,4 @@
+# `input` cannot read a bool. Read an i64, check it, and convert: bool(n).
+# expect: E0509 at 4:1
+bool: ready
+input ready

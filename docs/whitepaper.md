@@ -1,6 +1,6 @@
 # Scribe: a safe, readable front end for C
 
-*Design whitepaper, draft 2. The language today has the scalar types i64, f64 and f32, declarations, chained and multiple assignment, blocks, `if`/`while` and `goto`; [`language.md`](language.md) describes it. Everything else here is a design target.*
+*Design whitepaper, draft 3. The language today has the scalar types i64, f64, f32 and bool, declarations, chained and multiple assignment, `and`/`or`/`not`, comparison chains, blocks, `if`/`while` and `goto`; [`language.md`](language.md) describes it. Everything else here is a design target.*
 
 ## 1. Thesis
 
@@ -16,7 +16,7 @@ Each point is stated, then judged: what holds, where the risks are and what we r
 **Agree, and this is the right organising principle.** Two consequences:
 
 - The guarantee must be *enumerable*. We keep a catalogue of C's undefined behaviours and, for each, the mechanism that rules it out (compile-time rejection, a checked runtime operation, or a construct that cannot be expressed). See [`ub-catalogue.md`](design/ub-catalogue.md). Every new feature must update that table before it ships.
-- Rejecting is not enough; **the runtime behaviour on violation must also be defined**. Policy: a violated check (overflow, bounds, division by zero, failed `require`) *traps*: it prints a located message and stops the program (`abort()`, so a nonzero exit status). No silent wraparound, no exceptions in v1. This is how integer overflow, integer division by zero and out-of-range float-to-integer casts behave today.
+- Rejecting is not enough; **the runtime behaviour on violation must also be defined**. Policy: a violated check (overflow, division by zero, and later array bounds) *traps*: it prints a located message and stops the program (`abort()`, so a nonzero exit status). No silent wraparound, no exceptions in v1. This is how integer overflow, integer division by zero and out-of-range float-to-integer casts behave today.
 - Defence in depth: every program the test suite generates is built with `-std=c11 -pedantic-errors -Wall -Wextra`. The runtime-error tests always build with UBSan, so a check that fires too late shows up as a sanitizer report, and `SCRIBE_SANITIZE=1` builds every run with UBSan. AddressSanitizer joins once there is heap memory to check. The guarantee is only as good as the emitter and the hand-written runtime, so both are tested adversarially.
 - AI-friendliness is a design input: one obvious way to do each thing, locally checkable rules, diagnostics precise enough to feed back into a model.
 - `goto` exists today. It interacts with cleanup (jumping out of a scope must run destructors). Keep it function-local and lower it so cleanups run on every exit edge; revisit whether it survives past v0.5.
@@ -57,6 +57,16 @@ Text-level C templating (macros or string substitution) is cheap to start with b
 
 Open: stack depth. Unbounded recursion overflows the C stack, which is not defined behaviour we can check cheaply. See open questions.
 
+### 2.7 Booleans and logical operators
+**Implemented.** The choices follow the same principle as the numeric rules: nothing implicit that could surprise.
+
+- `bool` lowers to `uint8_t`, not `_Bool`, so its C spelling and size are the same everywhere and a future `Array[bool]` is one byte per element. **Storage invariant:** every stored bool is exactly 0 or 1. It holds by construction: a bool starts at 0 and can only be given `true`/`false`, a comparison, `not`, `and`, `or`, `bool(n)` or another bool, and the C for each of those yields 0 or 1.
+- **Truth tests** (conditions, operands of `not`/`and`/`or`) accept a bool or an integer. A float is a compile error, because "true unless 0.0" makes NaN true and `-0.0` false; programs write `x != 0.0`.
+- `and` and `or` **short-circuit and return a bool**, lowered to C `&&` and `||`. Returning an operand, as Python does, would make the result's type depend on its operands. Short-circuiting is observable even though expressions have no side effects, because a runtime check is an effect: `n == 0 or 10 / n > 1` never divides by zero.
+- **No implicit conversion** between bool and numbers in either direction, and no arithmetic or ordering on bools; `bool(n)` and `i64(flag)` are the explicit forms.
+- **Comparison chains** (`a < b <= c`) mean what they do in Python, with the middle operand evaluated once. They must point one way, and `!=` cannot be chained, because `a != b != c` does not say all three differ.
+- Precedence is Python's: `or` < `and` < `not` < comparisons.
+
 ## 3. Pipeline
 
 ```
@@ -72,7 +82,7 @@ Today the pipeline is `parse -> AST -> semantics (scopes and types) -> C text`. 
 | Version | Adds | Safety work |
 |---|---|---|
 | 0.1 (done) | float-only, blocks, `goto`, strings in `print` | float literals, `puts`, name prefixes |
-| 0.2 (in progress) | done: `i64`, `f64`, `f32`, Python-style literals, declarations, chained and multiple assignment, casts. Next: `bool` and conditions as expressions, sized integers, `**`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
+| 0.2 (in progress) | done: `i64`, `f64`, `f32`, `bool`, Python-style literals, declarations, chained and multiple assignment, casts, `and`/`or`/`not`, conditions as expressions, comparison chains. Next: sized integers, `**`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
 | 0.3 | functions, recursion, `return` | missing-return analysis, stack-depth policy |
 | 0.4 | arrays, strings, `for`, runtime templates | bounds checks, allocation-failure policy |
 | 0.5 | `struct`, value semantics, borrow rules | exclusive access, move checking |
@@ -101,7 +111,7 @@ Not a C replacement for systems code that needs raw pointers; not a macro system
 ## 7. Supporting documents
 
 - [`design/ub-catalogue.md`](design/ub-catalogue.md) - every C UB we must rule out, and how.
-- [`design/type-system.md`](design/type-system.md) - types, conversions, inference, overloading, unions.
+- [`design/type-system.md`](design/type-system.md) - types, conversions, inference, booleans, overloading, unions.
 - [`design/memory-model.md`](design/memory-model.md) - value semantics, borrows, RAII, escape analysis, RC.
 - [`design/lowering.md`](design/lowering.md) - naming, templates, monomorphisation, emitted C shape.
 - [`../examples/README.md`](../examples/README.md) - runnable examples and proposed syntax.

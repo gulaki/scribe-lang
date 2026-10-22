@@ -103,14 +103,14 @@ class Block(Stmt):
 class Elif(Node):
     """One `elif <condition> { ... }` arm of an If. Not a statement itself."""
 
-    condition: Comparison
+    condition: Expr
     body: Block
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
 @dataclass(frozen=True)
 class If(Stmt):
-    condition: Comparison
+    condition: Expr
     body: Block
     elifs: tuple[Elif, ...] = ()
     orelse: Block | None = None
@@ -119,7 +119,7 @@ class If(Stmt):
 
 @dataclass(frozen=True)
 class While(Stmt):
-    condition: Comparison
+    condition: Expr
     body: Block
     location: SourceLocation = field(default_factory=SourceLocation)
 
@@ -160,6 +160,12 @@ class FloatLit(Expr):
 
 
 @dataclass(frozen=True)
+class BoolLit(Expr):
+    value: bool
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
 class Variable(Expr):
     name: str
     location: SourceLocation = field(default_factory=SourceLocation)
@@ -190,6 +196,33 @@ class Binary(Expr):
 
 @dataclass(frozen=True)
 class Comparison(Expr):
+    left: Expr
+    operator: str
+    right: Expr
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class ComparisonChain(Expr):
+    """`a < b <= c`: means `a < b and b <= c`, with `b` evaluated once.
+    There is one more operand than operators."""
+
+    operands: tuple[Expr, ...]
+    operators: tuple[str, ...]
+    operator_locations: tuple[SourceLocation, ...] = ()
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class Not(Expr):
+    operand: Expr
+    location: SourceLocation = field(default_factory=SourceLocation)
+
+
+@dataclass(frozen=True)
+class Logical(Expr):
+    """`a and b`, `a or b`: short-circuiting, with a bool result."""
+
     left: Expr
     operator: str
     right: Expr
