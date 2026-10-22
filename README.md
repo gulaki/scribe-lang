@@ -48,7 +48,7 @@ build file elsewhere, and `--diagnostics-format json` prints errors as JSON.
 i64: n                     # a declaration: n is an i64, starting at 0
 input n                    # reads a whole number
 a, b = 0, 1                # multiple assignment
-while n > 0 {
+while n {                  # an integer condition: true until n is 0
     a, b = b, a + b        # both values use the old a and b
     n = n - 1
 }
@@ -62,6 +62,8 @@ if low + high >= 32 {
     print "small"
 }
 print 7 / 2                # integer division truncates
+in_range = 0 < a <= 100    # a comparison chain gives a bool
+print in_range and not (a == 0)
 ```
 
 ```output
@@ -69,6 +71,7 @@ print 7 / 2                # integer division truncates
 27.50
 big
 3
+true
 ```
 
 - **[The language reference](docs/language.md)**: every feature, with

@@ -12,7 +12,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 6 | Use of uninitialised variable | emit: every variable is zero-initialised (globals and block locals), and a declaration assigns its value or zero every time it runs | done |
 | 7 | Use after free, double free, dangling pointer | absent: no pointers; ownership and second-class borrows (memory-model.md) | n/a |
 | 8 | Memory leak (not UB, but forbidden) | emit: scope-exit frees on every path | n/a |
-| 9 | Unsequenced modifications / unspecified evaluation order | emit: operands with side effects are hoisted to temporaries; Scribe defines left-to-right | expressions are pure today; multiple assignment evaluates its values left to right (into temporaries when a value reads an earlier target), so runtime errors happen in source order |
+| 9 | Unsequenced modifications / unspecified evaluation order | emit: operands with side effects are hoisted to temporaries; every temporary is written once, then read only after a sequence point (`&&`, `\|\|`, `,`) | partly done. No undefined behaviour: expressions only read variables, and a chain temporary (`(v_a < (t_1 = ...)) && (t_1 < v_c)`) is written once and read after `&&`. Statements, multiple-assignment values, `and`/`or` and chains run left to right. **Gap:** the order of the two operands of one operation is C's, which is unspecified, so when both would fail (`a * a + b * b`, both overflowing), which runtime error is reported can depend on the C compiler. Fixing it needs the IR (lowering.md). |
 | 10 | Strict-aliasing violations | absent: no casts between pointer types; byte access via `memcpy` | n/a |
 | 11 | Out-of-range float-to-int conversion, NaN to int (C11 6.3.1.4) | check in `i64(x)`; constants checked at compile time | done |
 | 12 | `printf`-style format string misuse | emit: strings print through `puts`/`fwrite`, never as formats | done |
@@ -26,16 +26,21 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 20 | Modifying a string literal | absent: literals are immutable values; copies are heap strings | no string values |
 | 21 | Data races | absent: no threads in v1 | n/a |
 | 22 | Calling a function through a wrong-typed pointer / missing prototype | emit: no function pointers in v1; every function has a prototype | n/a |
-| 23 | Infinite loops without side effects (C11 forward-progress) | emit: loops only compile as-is under C11 where the controlling expression is non-constant; trivially infinite loops get a volatile touch (proposed) | open |
+| 23 | Infinite loops without side effects (C11 forward-progress) | emit: loops only compile as-is under C11 where the controlling expression is non-constant; trivially infinite loops get a volatile touch (proposed) | open; `while true` is safe, because `true` is emitted as the constant `1` and C11 6.8.5p6 does not apply to a constant controlling expression |
 | 24 | `scanf` conversion overflow (`%f` out of range is UB) | check: parse with `strtoll`/`strtod`/`strtof` and range-check instead of `scanf` | done: one reader per type; a token that is not a valid value of the type reads as 0 |
 | 25 | Floating-point environment / signalling NaN | emit: default environment; NaN compares as in IEEE (defined) | accepted |
 | 26 | Out-of-range float-to-narrower-float conversion (C11 6.3.1.5), e.g. `(float)1e300` | emit: `f32(x)` rounds as IEEE 754 does (±inf past the f32 range) in a helper, never a plain cast of an out-of-range value; literals are rounded at compile time | done |
 | 27 | Integer types narrower than `int` are promoted to `int` before arithmetic, so `u16 * u16` can overflow `int` | emit: small integer types will compute through helpers in a type wide enough for the result | n/a until i8..u32 exist (planned) |
 | 28 | Integer literal of the wrong type in a variadic call (`printf("%" PRId64, 5)` passes an `int`) | emit: integer constants are written `INT64_C(n)`; INT64_MIN as `(-INT64_C(9223372036854775807) - 1)` | done |
+| 29 | A `bool` holding a value other than 0 or 1 (with `_Bool`, a bad object representation is undefined) | emit: `bool` is a `uint8_t`, never `_Bool`, so every byte value is defined; it is only ever assigned from `0`, `1`, a comparison, `!`, `&&`, `\|\|` or `(n != 0)`, each of which C defines to give 0 or 1 | done: always 0 or 1, by construction |
+| 30 | Testing a float for truth: not undefined, but NaN would count as true and `-0.0` as false | reject: a float condition, `not`/`and`/`or` operand, or `bool(x)` is a compile error (E0505) | done |
+| 31 | Evaluating a guarded operation anyway (`n == 0 or 10 / n > 1`) | emit: `and`/`or` lower to C `&&`/`\|\|`, which evaluate the right operand only when needed (C11 6.5.13, 6.5.14), so a guarded runtime check never runs | done |
+| 32 | A chain evaluating its middle operand twice, or after a comparison failed | emit: a middle operand that is not a name or constant goes into a temporary at its first use (lowering.md) | done |
 
 ## Known gaps
 
-Row 23 (forward progress) is open. Rows marked n/a apply to features that do
+Row 23 (forward progress) is open, and row 9 has a gap: operand order inside
+one operation is unspecified in C. Rows marked n/a apply to features that do
 not exist yet; each must be done before its feature ships.
 
 ## Verification strategy

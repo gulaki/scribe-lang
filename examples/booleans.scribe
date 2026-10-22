@@ -1,0 +1,23 @@
+# Booleans: truth tests, short-circuit `and`/`or`, comparison chains, flags.
+print "Enter a number of minutes:"
+i64: minutes
+input minutes
+
+valid = 0 <= minutes < 24 * 60          # a chain: 0 <= m and m < 1440
+morning = minutes < 12 * 60
+print valid
+print valid and morning
+
+# `or` stops early, so the division only happens when count is not 0.
+count, total = 0, 90
+if count == 0 or total / count > 60 {
+    print "no average, or a long one"
+}
+
+# An integer condition is true until it reaches 0.
+i64: steps = 3
+while steps {
+    steps = steps - 1
+}
+print not steps                         # steps is 0
+print i64(valid) + i64(morning)         # a bool converts explicitly: 0 or 1

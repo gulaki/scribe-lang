@@ -1,8 +1,8 @@
 # Type system
 
-Status: **scalars i64, f64 and f32 are implemented**, with literals,
-inference, declarations, chained and multiple assignment, casts and checked
-arithmetic. To *use* them, read the [language reference](../language.md).
+Status: **scalars i64, f64, f32 and bool are implemented**, with literals,
+inference, declarations, chained and multiple assignment, casts, checked
+arithmetic, logical operators and comparison chains. To *use* them, read the [language reference](../language.md).
 This page records the rules, the reasons for them, and what comes next; items
 marked *planned* do not exist yet.
 
@@ -17,8 +17,8 @@ The type system is built in numbered tasks, each starting from failing tests.
 | # | Task | Status |
 |---|---|---|
 | 1 | `i64`, `f64`, `f32`; Python-style literals; inference; checked i64 arithmetic; casts | done |
-| 2 | `bool`, `true`/`false`, `and`/`or`/`not`; conditions as expressions (`while n {`) | next |
-| 3 | `i8` ... `i32`, `u8` ... `u64` (`char`, `byte` = `u8`), the full promotion table | planned |
+| 2 | `bool`, `true`/`false`, `and`/`or`/`not`; conditions as expressions (`while n {`); comparison chains | done |
+| 3 | `i8` ... `i32`, `u8` ... `u64` (`char`, `byte` = `u8`), the full promotion table | next |
 | 4 | Explicit declarations `i64: a, b = 5` | done |
 | 5 | Chained `a = b = 0` and multiple `a, b = b, a` assignment | done |
 | 6 | `**` | planned |
@@ -36,7 +36,7 @@ Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`) and
 | `f64` | `double` | implemented; IEEE 754 |
 | `f32` | `float` | implemented; IEEE 754 |
 | `i8` `i16` `i32`, `u8` `u16` `u32` `u64` | `int8_t` ... `uint64_t` | planned; `char` and `byte` are `u8` |
-| `bool` | `bool` | planned, with `and`, `or`, `not` and conditions as expressions |
+| `bool` | `uint8_t`, always 0 or 1 | implemented; see [Booleans](#booleans) |
 | `f16`, `f128` | `_Float16`, `_Float128` | planned, per target: not in C11, and Apple arm64 has no binary128 |
 | `str` | an array, once arrays exist | planned |
 
@@ -178,9 +178,49 @@ no pointer casts.
 | float -> integer | truncates toward zero; NaN or out of range is a runtime error (C11 6.3.1.4 makes it undefined) |
 | `f64 -> f32` | rounds to nearest; beyond the f32 range gives ±inf as IEEE 754 does (a plain C cast is undefined there, C11 6.3.1.5); NaN stays NaN |
 | integer narrowing | planned: checked, with explicit wrapping forms such as `wrap_u8(x)` |
+| `bool(n)` from an integer | `n != 0` |
+| `bool(x)` from a float | compile error (E0505): a float has no truth value; compare it |
+| `i64(b)`, `f64(b)`, `f32(b)` from a bool | 0 or 1, exact |
 
 A cast of an integer constant is checked at compile time: `i64(9223372036854775808)`
 is an error.
+
+## Booleans
+
+`bool` has the values `true` and `false`. Comparisons, comparison chains,
+`not`, `and` and `or` all give a `bool`.
+
+**Truth tests.** A condition of `if`, `elif` or `while`, an operand of `not`,
+`and` or `or`, and the operand of `bool(...)` must be a `bool` or an integer.
+An integer is true when it is not 0. A float is a compile error (E0505)
+rather than "true unless 0.0": that rule would make NaN true and `-0.0`
+false, which is rarely what a program means. Write `x != 0.0`.
+
+**A bool is not a number.** There is no implicit conversion between `bool`
+and the numeric types in either direction: `bool: f = 1` and `n = true` (for
+an i64 `n`) are type mismatches (E0501), and `flag == 1` has no common type
+(E0502). Arithmetic and ordering on a bool are errors (E0506); `==` and `!=`
+compare two bools. `bool(n)` and `i64(flag)` convert explicitly. The truth
+test above is the one place an integer is read as a truth value without a
+cast, and it never produces a stored bool by itself.
+
+**`and` and `or`** short-circuit and give a `bool` (not one of their
+operands, as Python's do: in a typed language that would make the result's
+type depend on the operand types). The right operand is evaluated only when
+the left one does not decide the answer, which matters today because a
+runtime check is observable: `n == 0 or 10 / n > 1` never divides by zero.
+
+**Comparison chains.** `a < b <= c` means `a < b and b <= c`, with `b`
+evaluated once, as in Python. Every operand of a chain is compared in one
+common type: since implicit conversions are exact, that gives the same
+answer as comparing each pair in its own type. A chain points one way (all
+`<`/`<=`, all `>`/`>=`, or all `==`); mixed directions (E0508) and `!=`
+(E0507, because `a != b != c` does not mean all three differ) are errors.
+
+**Storage.** A `bool` is a `uint8_t` that is always exactly 0 or 1. Nothing
+needs to enforce that: the only ways to make a bool are `true`/`false`,
+comparisons, `!`, `&&`, `||` and `bool(n)` (`n != 0`), and in C each of
+these gives 0 or 1. `input` cannot read a bool (E0509).
 
 ## Runtime checks
 

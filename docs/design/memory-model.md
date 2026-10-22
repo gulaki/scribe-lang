@@ -2,6 +2,14 @@
 
 Goal: no pointers in the language, no lifetimes in the syntax, no leaks, no use-after-free, with cleanup decided by the compiler.
 
+## 0. Scalars (implemented)
+
+`i64`, `f64`, `f32` and `bool` are plain C values (`int64_t`, `double`,
+`float`, `uint8_t`) with no ownership to track. A `bool` takes one byte and
+is always exactly 0 or 1 (see type-system.md, "Booleans"), so a future
+`Array[bool]` is one byte per element with no packing. Generated C that uses
+`bool` or `i64` includes `<stdint.h>`.
+
 ## 1. Value semantics
 
 `struct`, `Array` and `str` behave like values. `b = a` means `b` is independent of `a`. The compiler implements this with a move when `a` is dead afterwards (decided by last-use analysis) and a copy otherwise (optionally copy-on-write for large arrays). Programmers can reason locally: mutation through one name never shows up under another.
