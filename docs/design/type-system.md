@@ -107,7 +107,8 @@ cannot be read by its own value (`i64: a = a` is E0201).
   executes, so after a backward `goto` the variable starts again. Like every
   variable, it is also declared and zeroed at the top of its C block, so a
   `goto` can never skip its declaration.
-- Only the types that exist can be declared: `i64`, `f64` and `f32` for now.
+- Only the types that exist can be declared: `i64`, `f64`, `f32` and `bool`
+  for now.
 
 ### Chained assignment
 
@@ -166,7 +167,7 @@ be a surprise.
 
 ## Casts
 
-A cast is written like a call: `f64(n)`, `i64(x)`, `f32(x)`. It will become
+A cast is written like a call: `f64(n)`, `i64(x)`, `f32(x)`, `bool(n)`. It will become
 an ordinary overloadable constructor, which is how classes will convert too.
 Casts convert values; there is no way to reinterpret bits, and there will be
 no pointer casts.
@@ -218,9 +219,9 @@ answer as comparing each pair in its own type. A chain points one way (all
 (E0507, because `a != b != c` does not mean all three differ) are errors.
 
 **Storage.** A `bool` is a `uint8_t` that is always exactly 0 or 1. Nothing
-needs to enforce that: the only ways to make a bool are `true`/`false`,
-comparisons, `!`, `&&`, `||` and `bool(n)` (`n != 0`), and in C each of
-these gives 0 or 1. `input` cannot read a bool (E0509).
+needs to enforce that: a bool starts at 0, and the only values it can be
+given are `true`/`false`, comparisons, `!`, `&&`, `||`, `bool(n)` (`n != 0`)
+and another bool. In C each of these gives 0 or 1. `input` cannot read a bool (E0509).
 
 ## Runtime checks
 

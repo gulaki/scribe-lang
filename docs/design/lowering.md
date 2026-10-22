@@ -64,7 +64,7 @@ User generics are instantiated in the IR: collect reachable `(function, type-arg
 | `if a < b` | `if (v_a < v_b)`: no doubled parentheses (clang warns on `if ((a == b))`) |
 | `if flag`, `if n` | `if (v_flag)`, `if (v_n != 0)` |
 | `a < b <= c` | `((v_a < v_b) && (v_b <= v_c))` |
-| `a < f(b) <= c` | `((v_a < (t_1 = <f(b)>)) && (t_1 <= v_c))`: a middle operand that is not a name or constant is evaluated once, at its first use |
+| `a < b + 1 <= c` | `((v_a < (t_1 = scribe_add_i64(v_b, INT64_C(1), 0))) && (t_1 <= v_c))`: a middle operand that is not a name or constant is evaluated once, at its first use |
 | `bool(n)` | `(v_n != 0)` |
 | `i64(flag)` | `((int64_t)v_flag)` |
 | `print flag` | `puts(v_flag ? "true" : "false");` |

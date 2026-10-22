@@ -29,7 +29,7 @@ Exclusivity is checked: while a `mut` borrow (or a `for` loop's borrow of its co
 ## 3. Placement and cleanup
 
 - **Escape analysis** decides placement. A value that never leaves its function is stack-allocated (small) or heap-allocated with a frame-owned free (large or growable). A value that is returned, moved into a longer-lived owner or captured gets a heap owner.
-- **Cleanup** is inserted by lowering at every scope exit: fallthrough, `return`, `break`/`continue`, `goto` out of the scope, and a trap path when running inside a destructor-needing frame is not required (a trap exits the process).
+- **Cleanup** is inserted by lowering at every scope exit: fallthrough, `return`, `break`/`continue` and `goto` out of the scope. A trap needs no cleanup, because it ends the process.
 - Lowering uses a cleanup ladder: one `cleanup_N:` label per live owner in reverse order, with exits jumping to the right rung. Straightforward C, no hidden state.
 
 ## 4. Classes and sharing (later)

@@ -60,7 +60,7 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0503 | constant-overflow | An integer constant expression, computed exactly, has a result that does not fit its type. |
 | E0504 | constant-division-by-zero | Division by zero in an integer constant expression, such as `10 / 0`. |
 | E0505 | not-a-truth-value | A float used as a condition, as an operand of `not`, `and` or `or`, or in `bool(x)`. Only a bool or an integer can be tested for truth; a float would make NaN true and -0.0 false. Compare it explicitly: `x != 0.0`. |
-| E0506 | bool-operator | Arithmetic (`+ - * /`, unary `-`) or ordering (`< <= > >=`) on a bool. A bool is not a number; convert it with `i64(flag)`, or compare it with `==` and `!=`. |
+| E0506 | bool-operator | Arithmetic (`+ - * /`, unary `-` and `+`) or ordering (`< <= > >=`) on a bool. A bool is not a number; convert it with `i64(flag)`, or compare it with `==` and `!=`. |
 | E0507 | chained-not-equal | `!=` in a comparison chain. `a != b != c` would not mean that all three differ. Write the pairs you mean with `and`. |
 | E0508 | mixed-comparison-chain | A comparison chain that changes direction, such as `a < b > c`, or mixes `==` with `<`. A chain is all `<`/`<=`, all `>`/`>=`, or all `==`. |
 | E0509 | cannot-input-type | `input` into a bool. Read an i64 and convert it: `bool(n)`. |
@@ -86,8 +86,9 @@ prog.scribe:4:11: runtime error: integer overflow
 |---|---|
 | `integer overflow` | An i64 `+`, `-`, `*`, `/` or negation whose result does not fit, including `-9223372036854775808 / -1`. |
 | `division by zero` | An i64 division by zero. Float division by zero is defined: it gives `inf` or `nan`. |
-| `value out of range for i64` | `i64(x)` where `x` is NaN, infinite, or outside the range of i64. | Warnings,
-when there are some, will use `W` codes.
+| `value out of range for i64` | `i64(x)` where `x` is NaN, infinite, or outside the range of i64. |
+
+Warnings, when there are some, will use `W` codes.
 
 ## Adding an error
 

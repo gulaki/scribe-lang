@@ -301,7 +301,7 @@ print n * x
 
 ### Casts
 
-A cast is written like a call: `i64(x)`, `f64(n)`, `f32(x)`.
+A cast is written like a call: `i64(x)`, `f64(n)`, `f32(x)`, `bool(n)`.
 
 | Cast | Result |
 |---|---|
@@ -309,6 +309,8 @@ A cast is written like a call: `i64(x)`, `f64(n)`, `f32(x)`.
 | `f64(x)` from an `f32` | exact |
 | `f32(x)` from an `f64` | the nearest `f32`; out of range gives ±inf |
 | `i64(x)` from a float | truncated toward zero; NaN or out of range stops the program |
+| `bool(n)` from an integer | `n != 0`; from a float it is an error (E0505) |
+| `i64(flag)`, `f64(flag)`, `f32(flag)` from a bool | 0 or 1 |
 
 ```scribe
 n = 3
@@ -463,16 +465,16 @@ input flag
 
 From tightest to loosest:
 
-1. `( ... )`, casts, `true`, `false`
-2. unary `-` and `+`
-3. `*` `/`
-4. `+` `-`
-5. comparisons and chains: `==` `!=` `<` `<=` `>` `>=`
-6. `not`
-7. `and`
-8. `or`
+1. unary `-` and `+`
+2. `*` `/`
+3. `+` `-`
+4. comparisons and chains: `==` `!=` `<` `<=` `>` `>=`
+5. `not`
+6. `and`
+7. `or`
 
-`and` and `or` group from the left.
+`*`, `/`, `+`, `-`, `and` and `or` group from the left. Parentheses group
+explicitly. A value can have only one sign, so write `-(-x)`, not `- -x`.
 
 ## Control flow
 
@@ -535,10 +537,10 @@ Compile-time errors are listed in [errors.md](errors.md).
 ## Reserved words
 
 These cannot be used as names: `print`, `input`, `if`, `elif`, `else`,
-`while`, `label`, `goto`, `true`, `false`, `and`, `or`, `not`, and the type names `i8`, `i16`, `i32`, `i64`, `u8`,
-`u16`, `u32`, `u64`, `f16`, `f32`, `f64`, `f128`, `bool`, `char`, `byte` and
-`str`. Only `i64`, `f64` and `f32` are usable types so far; the others are
-reserved for later.
+`while`, `label`, `goto`, `true`, `false`, `and`, `or`, `not`, and the type
+names `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f16`, `f32`,
+`f64`, `f128`, `bool`, `char`, `byte` and `str`. Only `i64`, `f64`, `f32` and
+`bool` are usable types so far; the others are reserved for later.
 
 ## Not available yet
 
@@ -558,5 +560,7 @@ are zero-initialised globals. A variable from a block is declared, set to
 zero, at the top of that C block, so a `goto` can never skip its declaration.
 Integer arithmetic calls small checked helpers such as `scribe_add_i64`,
 emitted only when a program uses them. A `bool` is a `uint8_t` that is
-always 0 or 1, and `and`/`or` become C's `&&` and `||`. The C compiles cleanly with
-`cc -std=c11 -pedantic-errors -Wall -Wextra`.
+always 0 or 1, and `and`/`or` become C's `&&` and `||`. The C builds with
+`cc -std=c11 -pedantic-errors -Wall -Wextra`. One known exception to a
+warning-free build: comparing a variable with itself (`a == a`) makes clang
+warn that the result is always the same.

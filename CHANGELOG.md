@@ -20,7 +20,8 @@ The language as it is now is described in [`docs/language.md`](docs/language.md)
 - `bool`, with `true` and `false`, `not`, `and`, `or`. `and` and `or` are
   short-circuit, so `n == 0 or 10 / n > 1` never divides by zero.
 - Conditions are any bool or integer expression: `while n {`.
-- Comparisons give a `bool`, and chain as in Python: `a < b <= c`.
+- Comparisons give a `bool`, and chain in one direction: `a < b <= c`.
+  Unlike Python, `!=` and mixed directions (`a < b > c`) cannot be chained.
 - `print` of a bool shows `true` or `false`; `input` reads the variable's type.
 - Errors E0109, E0203, E0501–E0509 and E0601–E0602; see
   [`docs/errors.md`](docs/errors.md).
