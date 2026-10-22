@@ -1,0 +1,5 @@
+# `/` divides floats. Use `//` for integer division, or convert to a float.
+# expect: E0511 at 5:13
+count = 7
+total = 30
+print total / count

@@ -271,16 +271,16 @@ program is compiled, so only the final value has to fit in an `i64`. Integer
 division truncates toward zero, and float division does not.
 
 ```scribe
+print 7 // 2
+print -7 // 2
 print 7 / 2
-print -7 / 2
-print 7.0 / 2
 print -9223372036854775808
-print 4294967296 * 4294967296 / 4294967296
+print 4294967296 * 4294967296 // 4294967296
 ```
 
 ```output
 3
--3
+-4
 3.50
 -9223372036854775808
 4294967296
@@ -386,10 +386,10 @@ program:
 
 ```scribe
 n = 0
-if n == 0 or 10 / n > 1 {
+if n == 0 or 10 // n > 1 {
     print "safe"
 }
-print n != 0 and 10 / n > 1
+print n != 0 and 10 // n > 1
 ```
 
 ```output

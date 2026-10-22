@@ -219,10 +219,10 @@ def test_casts_between_bool_and_numbers(run_scribe):
 
 @pytest.mark.parametrize("program, expected", [
     # The right side would stop the program with "division by zero".
-    ('n = 0\nif n == 0 or 10 / n > 1 {\n    print "guarded"\n}\n', "guarded\n"),
-    ("n = 0\nprint n != 0 and 10 / n > 1\n", "false\n"),
-    ("a, b, n = true, false, 0\nprint a or (b and 10 / n > 1)\n", "true\n"),
-    ("a, b, n = false, false, 0\nprint a or (b and 10 / n > 1)\n", "false\n"),
+    ('n = 0\nif n == 0 or 10 // n > 1 {\n    print "guarded"\n}\n', "guarded\n"),
+    ("n = 0\nprint n != 0 and 10 // n > 1\n", "false\n"),
+    ("a, b, n = true, false, 0\nprint a or (b and 10 // n > 1)\n", "true\n"),
+    ("a, b, n = false, false, 0\nprint a or (b and 10 // n > 1)\n", "false\n"),
     # A chain stops at the first comparison that fails: x + 1 would overflow.
     ("x = 9223372036854775807\nprint 1 > 2 > x + 1\n", "false\n"),
     ("x = 9223372036854775807\nprint 1 > 2 > x + 1 > 0\n", "false\n"),
@@ -232,7 +232,7 @@ def test_short_circuit_skips_the_rest(run_trapping_or_output, program, expected)
 
 
 def test_needed_right_side_is_still_evaluated(run_trapping):
-    assert run_trapping("n = 0\nprint n == 0 and 10 / n > 1\n") == "t.scribe:2:21: runtime error: division by zero\n"
+    assert run_trapping("n = 0\nprint n == 0 and 10 // n > 1\n") == "t.scribe:2:21: runtime error: division by zero\n"
 
 
 def test_truth_table_matches_a_python_reference(run_scribe):

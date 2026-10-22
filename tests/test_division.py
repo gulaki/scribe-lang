@@ -132,3 +132,50 @@ def test_remainder_of_the_smallest_i64_by_minus_one_is_zero(run_trapping_or_outp
 def test_remainder_as_a_truth_test(run_scribe):
     source = "n = 1\nwhile n <= 6 {\n    if n % 2 {\n        print n\n    }\n    n = n + 1\n}\n"
     assert run_scribe(source) == "1\n3\n5\n"
+
+
+# -- `/` is float division ---------------------------------------------------------
+
+@pytest.mark.parametrize("source, output", [
+    ("f64: a = 7 / 2\nprint a\n", "3.50\n"),
+    ("print 7 / 2\n", "3.50\n"),
+    ("a = 7 / 2\nprint a\n", "3.50\n"),
+    ("f32: a = 1 / 4\nprint a\n", "0.25\n"),
+    ("print (2 + 3) / 2\n", "2.50\n"),
+    ("print 7 // 2 / 2\n", "1.50\n"),
+    ("x = 7.0\nprint x / 2\n", "3.50\n"),
+    ("n = 7\nprint f64(n) / 2\n", "3.50\n"),
+    ("print i64(7 / 2)\n", "3\n"),
+    ("print 1 / 0\n", "inf\n"),
+    ("print 7 / 2 > 3\n", "true\n"),
+])
+def test_slash_divides_as_floats(run_scribe, source, output):
+    assert run_scribe(source) == output
+
+
+def test_a_constant_quotient_is_a_float():
+    found, model = analyze("a = 6 / 2\n")
+    assert found == []
+    assert str(model.root.symbols["a"].type) == "f64"
+
+
+@pytest.mark.parametrize("source, position", [
+    ("n = 7\nprint n / 2\n", (2, 9)),
+    ("n = 7\nm = 2\nprint n / m\n", (3, 9)),
+    ("n = 7\nprint 14 / n\n", (2, 10)),
+])
+def test_slash_on_integers_is_an_error(source, position):
+    found = analyze(source)[0]
+    assert [(d.code.code, d.span.line, d.span.column) for d in found] == [("E0511", *position)]
+    assert found[0].message == "'/' divides floats, not i64"
+    assert "'//'" in found[0].help and "f64(" in found[0].help
+
+
+def test_a_float_quotient_does_not_fit_an_integer():
+    assert positions("i64: a = 7 / 2\n") == [("E0501", 1, 10)]
+
+
+def test_float_division_emits_plain_c(compiler):
+    c = compiler.compile("f64: a = 7 / 2\n").c_source
+    assert "v_a = (7.0 / 2.0);" in c
+    assert "scribe_div_i64" not in c

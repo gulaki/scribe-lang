@@ -131,8 +131,8 @@ _DIRECTION = {"<": "up", "<=": "up", ">": "down", ">=": "down", "==": "equal", "
 
 def _fold(op: str, a: int, b: int) -> int | None:
     """`a op b` on exact integers, as the generated C computes it; None for
-    division by zero. Division truncates toward zero, like C. `//` and `%`
-    round toward negative infinity, as Python's do."""
+    division by zero. `//` and `%` round toward negative infinity, as
+    Python's do."""
     if op == "+":
         return a + b
     if op == "-":
@@ -143,10 +143,7 @@ def _fold(op: str, a: int, b: int) -> int | None:
         return None
     if op == "//":
         return a // b
-    if op == "%":
-        return a % b
-    quotient = abs(a) // abs(b)
-    return quotient if (a < 0) == (b < 0) else -quotient
+    return a % b
 
 
 def _count(n: int, noun: str) -> str:
@@ -200,7 +197,9 @@ class SemanticAnalyzer:
       value has to fit (`-9223372036854775808` is fine).
     * A binary operator works in `types.common_type` of its operands, and it
       is an error if there is none: i64 and f64 need an explicit cast.
-    * `//` and `%` work on integers only, rounding toward negative infinity.
+    * `/` divides floats; constants become floats (`7 / 2` is 3.5) and an
+      integer operand is an error. `//` and `%` work on integers only,
+      rounding toward negative infinity.
     * A truth test (a condition, an operand of `not`/`and`/`or`, `bool(x)`)
       takes a bool or an integer. A float is an error: NaN would count as
       true and -0.0 as false, so the program must compare explicitly.
@@ -473,6 +472,8 @@ class SemanticAnalyzer:
                 self._diagnostics.error(codes.INTEGER_OPERATOR, expr.operator_location,
                                         op=expr.operator, type=type_, help=help)
                 return None
+        if expr.operator == "/" and isinstance(left, _Const) and isinstance(right, _Const):
+            return _UNTYPED_FLOAT  # `7 / 2` is 3.5: the literals become floats
         if isinstance(left, _Const) and isinstance(right, _Const):
             value = _fold(expr.operator, left.value, right.value)
             if value is None:
@@ -481,7 +482,14 @@ class SemanticAnalyzer:
             return _Const(value)
         if not isinstance(left, ScalarType) and not isinstance(right, ScalarType):
             return _UNTYPED_FLOAT  # literals only, at least one of them a float
-        return self._operand_type(expr, expr.operator_location, left, right)
+        type_ = self._operand_type(expr, expr.operator_location, left, right)
+        if expr.operator == "/" and type_ is not None and type_.is_integer:
+            self._diagnostics.error(
+                codes.FLOAT_DIVISION, expr.operator_location, type=type_,
+                help="use '//' for integer division (it rounds down), or divide as floats: f64(a) / f64(b)",
+            )
+            return None
+        return type_
 
     def _truth(self, expr: Expr, scope: Scope, what: str) -> None:
         self._truth_test(expr, self._infer(expr, scope), what)

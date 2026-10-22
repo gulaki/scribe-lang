@@ -100,7 +100,7 @@ def test_temporaries_only_when_a_value_reads_an_earlier_target(compiler):
 
 
 def test_values_are_evaluated_left_to_right(run_trapping):
-    program = "x = 9223372036854775807\ny = 0\nx, y = x + 1, 1 / y\n"
+    program = "x = 9223372036854775807\ny = 0\nx, y = x + 1, 1 // y\n"
     assert run_trapping(program) == "t.scribe:3:10: runtime error: integer overflow\n"
-    swapped = "x = 9223372036854775807\ny = 0\nx, y = 1 / y, x + 1\n"
+    swapped = "x = 9223372036854775807\ny = 0\nx, y = 1 // y, x + 1\n"
     assert run_trapping(swapped) == "t.scribe:3:10: runtime error: division by zero\n"
