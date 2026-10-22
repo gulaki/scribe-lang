@@ -168,6 +168,40 @@ static int64_t scribe_div_i64(int64_t a, int64_t b, int site) {
     return a / b;
 }
 """, includes=["stdint.h"], needs=["scribe_trap"]),
+    # `//` and `%` round toward negative infinity, as in Python: C's `/` and
+    # `%` truncate, so a nonzero remainder whose sign differs from the
+    # divisor's moves one step. INT64_MIN % -1 is undefined in C (the quotient
+    # overflows) although the remainder, 0, fits.
+    "scribe_floordiv_i64": _helper("""
+static int64_t scribe_floordiv_i64(int64_t a, int64_t b, int site) {
+    if (b == 0) {
+        scribe_trap(site, "division by zero");
+    }
+    if (a == INT64_MIN && b == -1) {
+        scribe_trap(site, "integer overflow");
+    }
+    int64_t q = a / b;
+    if (a % b != 0 && (a < 0) != (b < 0)) {
+        q = q - 1;
+    }
+    return q;
+}
+""", includes=["stdint.h"], needs=["scribe_trap"]),
+    "scribe_mod_i64": _helper("""
+static int64_t scribe_mod_i64(int64_t a, int64_t b, int site) {
+    if (b == 0) {
+        scribe_trap(site, "division by zero");
+    }
+    if (b == -1) {
+        return 0;
+    }
+    int64_t r = a % b;
+    if (r != 0 && (r < 0) != (b < 0)) {
+        r = r + b;
+    }
+    return r;
+}
+""", includes=["stdint.h"], needs=["scribe_trap"]),
     "scribe_neg_i64": _helper("""
 static int64_t scribe_neg_i64(int64_t a, int site) {
     if (a == INT64_MIN) {
@@ -321,7 +355,10 @@ def _without_outer_parentheses(text: str) -> str:
     return text[1:-1]
 
 
-_CHECKED_I64 = {"+": "scribe_add_i64", "-": "scribe_sub_i64", "*": "scribe_mul_i64", "/": "scribe_div_i64"}
+_CHECKED_I64 = {
+    "+": "scribe_add_i64", "-": "scribe_sub_i64", "*": "scribe_mul_i64", "/": "scribe_div_i64",
+    "//": "scribe_floordiv_i64", "%": "scribe_mod_i64",
+}
 _READ = {types.I64: "scribe_read_i64", types.F64: "scribe_read_f64", types.F32: "scribe_read_f32"}
 
 
