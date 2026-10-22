@@ -28,8 +28,9 @@ def test_division_of_float_literals_is_float_division(run_scribe):
 
 
 def test_literal_division_by_zero_is_rejected_not_undefined(compiler, run_scribe):
-    assert [d.code.code for d in compiler.compile("print 1 / 0\n").diagnostics] == ["E0504"]
+    assert [d.code.code for d in compiler.compile("print 1 // 0\n").diagnostics] == ["E0504"]
     assert run_scribe("print 1.0 / 0\n") == "inf\n"
+    assert run_scribe("print 1 / 0\n") == "inf\n"  # `/` divides floats
 
 
 def test_literal_multiplication_does_not_overflow_int(run_scribe):
@@ -43,7 +44,8 @@ def test_literal_wider_than_any_c_integer(compiler, run_scribe):
 
 def test_comparison_of_literals_uses_their_values(run_scribe):
     assert run_scribe('if 7.0 / 2 == 3 {\n    print "int"\n} else {\n    print "float"\n}\n') == "float\n"
-    assert run_scribe('if 7 / 2 == 3 {\n    print "int"\n} else {\n    print "float"\n}\n') == "int\n"
+    assert run_scribe('if 7 / 2 == 3 {\n    print "int"\n} else {\n    print "float"\n}\n') == "float\n"
+    assert run_scribe('if 7 // 2 == 3 {\n    print "int"\n} else {\n    print "float"\n}\n') == "int\n"
 
 
 @pytest.mark.parametrize("literal, expected", [("7", "INT64_C(7)"), ("0", "INT64_C(0)"), ("2.5", "2.5"), ("2.5f", "2.5f")])

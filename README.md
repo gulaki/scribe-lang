@@ -61,7 +61,7 @@ if low + high >= 32 {
 } else {
     print "small"
 }
-print 7 / 2                # integer division truncates
+print 7 // 2               # integer division rounds down
 in_range = 0 < a <= 100    # a comparison chain gives a bool
 print in_range and not (a == 0)
 ```

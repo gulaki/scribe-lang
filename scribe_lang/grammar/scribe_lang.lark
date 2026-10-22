@@ -50,7 +50,7 @@ label_stmt: LABEL IDENT
 goto_stmt: GOTO IDENT
 
 // Precedence, loosest first, as in Python:
-//   or < and < not < comparisons < + - < * / < unary - +
+//   or < and < not < comparisons < + - < * / // % < unary - +
 // `and` and `or` are left-associative. `a < b <= c` is one chained
 // comparison, meaning `a < b and b <= c`.
 ?expression: or_expr
@@ -75,7 +75,8 @@ goto_stmt: GOTO IDENT
 type_name: I64 | F32 | F64 | BOOL
 
 ADD_OP: "+" | "-"
-MUL_OP: "*" | "/"
+// `//` before `/`, so `a // b` is never lexed as two divisions.
+MUL_OP: "*" | "//" | "/" | "%"
 SIGN: "+" | "-"
 COMP_OP: "==" | "!=" | ">=" | "<=" | ">" | "<"
 

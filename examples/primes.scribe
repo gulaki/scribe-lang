@@ -1,6 +1,5 @@
 # Primes up to a limit, by trial division.
-# Showcases: nested loops, `goto` as a "break/continue", and a remainder
-# computed with repeated subtraction (Scribe has no `%` operator).
+# Showcases: nested loops, `%`, and `goto` as a "break/continue".
 print "Print primes up to:"
 i64: limit             # declared i64, so `input` reads a whole number
 input limit
@@ -9,12 +8,8 @@ n = 2
 while n <= limit {
     d = 2
     while d * d <= n {
-        r = n                  # r ends up as n mod d
-        while r >= d {
-            r = r - d
-        }
-        if r == 0 {
-            goto composite     # leaves all three loops at once
+        if n % d == 0 {
+            goto composite     # leaves both loops at once
         }
         d = d + 1
     }

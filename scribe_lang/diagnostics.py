@@ -90,6 +90,8 @@ MIXED_COMPARISON_CHAIN = _register(
     "E0508", "mixed-comparison-chain", "a comparison chain cannot mix '{first}' and '{op}'",
 )
 CANNOT_INPUT_TYPE = _register("E0509", "cannot-input-type", "'input' cannot read a {type}")
+INTEGER_OPERATOR = _register("E0510", "integer-only-operator", "'{op}' works on integers, not {type}")
+FLOAT_DIVISION = _register("E0511", "float-only-division", "'/' divides floats, not {type}")
 
 ASSIGNMENT_COUNT_MISMATCH = _register(
     "E0601", "assignment-count-mismatch", "assignment has {targets} but {values}",

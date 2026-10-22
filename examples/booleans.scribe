@@ -10,7 +10,7 @@ print valid and morning
 
 # `or` stops early, so the division only happens when count is not 0.
 count, total = 0, 90
-if count == 0 or total / count > 60 {
+if count == 0 or total // count > 60 {
     print "no average, or a long one"
 }
 

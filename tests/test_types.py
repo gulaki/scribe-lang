@@ -61,13 +61,13 @@ def test_integer_literal_must_be_exact_in_a_float_context(compiler):
 
 # -- constant folding -----------------------------------------------------------
 
-def test_integer_division_truncates_toward_zero(run_scribe):
-    assert run_scribe("print 7 / 2\nprint -7 / 2\nx = 7\nprint x / 2\ny = -7\nprint y / 2\n") == "3\n-3\n3\n-3\n"
+def test_integer_floor_division_rounds_down(run_scribe):
+    assert run_scribe("print 7 // 2\nprint -7 // 2\nx = 7\nprint x // 2\ny = -7\nprint y // 2\n") == "3\n-4\n3\n-4\n"
 
 
 def test_constants_are_folded_exactly(run_scribe):
     # The intermediate 2**64 does not fit any C integer type.
-    assert run_scribe("print 4294967296 * 4294967296 / 4294967296\n") == "4294967296\n"
+    assert run_scribe("print 4294967296 * 4294967296 // 4294967296\n") == "4294967296\n"
 
 
 def test_constant_overflow(compiler):
@@ -75,7 +75,7 @@ def test_constant_overflow(compiler):
 
 
 def test_constant_division_by_zero(compiler):
-    assert codes(compiler, "print 1 / 0\n") == ["E0504"]
+    assert codes(compiler, "print 1 // 0\n") == ["E0504"]
 
 
 def test_float_division_by_zero_is_infinity(run_scribe):
@@ -172,8 +172,8 @@ def test_type_names_are_reserved(compiler):
     ("x = -9223372036854775808\ny = x - 1\n", "t.scribe:2:7: runtime error: integer overflow\n"),
     ("x = 4294967296\ny = x * x\n", "t.scribe:2:7: runtime error: integer overflow\n"),
     ("x = -9223372036854775808\ny = -x\n", "t.scribe:2:5: runtime error: integer overflow\n"),
-    ("x = -9223372036854775808\ny = x / -1\n", "t.scribe:2:7: runtime error: integer overflow\n"),
-    ("x = 0\ny = 1 / x\n", "t.scribe:2:7: runtime error: division by zero\n"),
+    ("x = -9223372036854775808\ny = x // -1\n", "t.scribe:2:7: runtime error: integer overflow\n"),
+    ("x = 0\ny = 1 // x\n", "t.scribe:2:7: runtime error: division by zero\n"),
     ("d = 1.0\ninput d\nn = i64(d)\n", "t.scribe:3:5: runtime error: value out of range for i64\n"),
 ])
 def test_runtime_errors_trap_with_a_location(run_trapping, program, message):
@@ -191,7 +191,7 @@ def test_arithmetic_near_the_limits_does_not_trap(run_scribe):
         "x = 9223372036854775806\nprint x + 1\n"
         "y = -9223372036854775807\nprint y - 1\n"
         "z = 3037000499\nprint z * z\n"
-        "w = -9223372036854775808\nprint w / 1\n"
+        "w = -9223372036854775808\nprint w // 1\n"
     )
     assert run_scribe(program) == (
         "9223372036854775807\n-9223372036854775808\n9223372030926249001\n-9223372036854775808\n"

@@ -58,12 +58,14 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0501 | type-mismatch | An assignment whose value does not convert losslessly to the variable's type, which was fixed by its first assignment. A note points at that assignment. Convert explicitly, e.g. `f64(n)`. |
 | E0502 | no-common-type | An operator or comparison mixes types that no type holds exactly, such as i64 and f64. Convert one side with a cast. |
 | E0503 | constant-overflow | An integer constant expression, computed exactly, has a result that does not fit its type. |
-| E0504 | constant-division-by-zero | Division by zero in an integer constant expression, such as `10 / 0`. |
+| E0504 | constant-division-by-zero | `//` or `%` by zero in an integer constant expression, such as `10 // 0`. |
 | E0505 | not-a-truth-value | A float used as a condition, as an operand of `not`, `and` or `or`, or in `bool(x)`. Only a bool or an integer can be tested for truth; a float would make NaN true and -0.0 false. Compare it explicitly: `x != 0.0`. |
-| E0506 | bool-operator | Arithmetic (`+ - * /`, unary `-` and `+`) or ordering (`< <= > >=`) on a bool. A bool is not a number; convert it with `i64(flag)`, or compare it with `==` and `!=`. |
+| E0506 | bool-operator | Arithmetic (`+ - * / // %`, unary `-` and `+`) or ordering (`< <= > >=`) on a bool. A bool is not a number; convert it with `i64(flag)`, or compare it with `==` and `!=`. |
 | E0507 | chained-not-equal | `!=` in a comparison chain. `a != b != c` would not mean that all three differ. Write the pairs you mean with `and`. |
 | E0508 | mixed-comparison-chain | A comparison chain that changes direction, such as `a < b > c`, or mixes `==` with `<`. A chain is all `<`/`<=`, all `>`/`>=`, or all `==`. |
 | E0509 | cannot-input-type | `input` into a bool. Read an i64 and convert it: `bool(n)`. |
+| E0510 | integer-only-operator | `//` or `%` on a float. They work on integers only. Divide floats with `/`, or convert first: `i64(x) // 2`. A float remainder is not available yet. |
+| E0511 | float-only-division | `/` on integers. `/` divides floats, so `7 / 2` is 3.5; for whole-number division use `//`, which rounds down, or convert: `f64(a) / f64(b)`. |
 | E0601 | assignment-count-mismatch | A multiple assignment has a different number of names and values, such as `a, b = 1` or `a = 1, 2`. |
 | E0602 | duplicate-assignment-target | A chained or multiple assignment names the same variable twice, such as `a = b = a = 0` or `a, a = 1, 2`. A note points at the first one. |
 
@@ -84,8 +86,8 @@ prog.scribe:4:11: runtime error: integer overflow
 
 | Message | Cause |
 |---|---|
-| `integer overflow` | An i64 `+`, `-`, `*`, `/` or negation whose result does not fit, including `-9223372036854775808 / -1`. |
-| `division by zero` | An i64 division by zero. Float division by zero is defined: it gives `inf` or `nan`. |
+| `integer overflow` | An i64 `+`, `-`, `*`, `//` or negation whose result does not fit, including `-9223372036854775808 // -1`. |
+| `division by zero` | An i64 `//` or `%` by zero. Float division by zero is defined: it gives `inf` or `nan`. |
 | `value out of range for i64` | `i64(x)` where `x` is NaN, infinite, or outside the range of i64. |
 
 Warnings, when there are some, will use `W` codes.

@@ -20,8 +20,8 @@ Every feature these programs use is explained in the
 
 Highlights: `types.scribe` (declarations, casts, chained and multiple
 assignment), `booleans.scribe` (truth tests, short-circuit `and`/`or`,
-comparison chains), `fibonacci.scribe` (`a, b = b, a + b`), `primes.scribe` (nested
-loops, `goto` as break) and `newton_sqrt.scribe` (float math, early exit,
+comparison chains), `fibonacci.scribe` (`a, b = b, a + b`), `gcd.scribe` (`%`),
+`primes.scribe` (nested loops, `goto` as break) and `newton_sqrt.scribe` (float math, early exit,
 block-scoped temporaries).
 
 `tests/test_example_folders.py` checks that every `errors/` file reports exactly

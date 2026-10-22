@@ -131,7 +131,8 @@ _DIRECTION = {"<": "up", "<=": "up", ">": "down", ">=": "down", "==": "equal", "
 
 def _fold(op: str, a: int, b: int) -> int | None:
     """`a op b` on exact integers, as the generated C computes it; None for
-    division by zero. Division truncates toward zero, like C."""
+    division by zero. `//` and `%` round toward negative infinity, as
+    Python's do."""
     if op == "+":
         return a + b
     if op == "-":
@@ -140,8 +141,9 @@ def _fold(op: str, a: int, b: int) -> int | None:
         return a * b
     if b == 0:
         return None
-    quotient = abs(a) // abs(b)
-    return quotient if (a < 0) == (b < 0) else -quotient
+    if op == "//":
+        return a // b
+    return a % b
 
 
 def _count(n: int, noun: str) -> str:
@@ -195,6 +197,9 @@ class SemanticAnalyzer:
       value has to fit (`-9223372036854775808` is fine).
     * A binary operator works in `types.common_type` of its operands, and it
       is an error if there is none: i64 and f64 need an explicit cast.
+    * `/` divides floats; constants become floats (`7 / 2` is 3.5) and an
+      integer operand is an error. `//` and `%` work on integers only,
+      rounding toward negative infinity.
     * A truth test (a condition, an operand of `not`/`and`/`or`, `bool(x)`)
       takes a bool or an integer. A float is an error: NaN would count as
       true and -0.0 as false, so the program must compare explicitly.
@@ -457,6 +462,18 @@ class SemanticAnalyzer:
         if types.BOOL in (left, right):
             self._diagnostics.error(codes.BOOL_OPERATOR, expr.operator_location, op=expr.operator)
             return None
+        if expr.operator in ("//", "%"):
+            floats = [info for info in (left, right) if info is _UNTYPED_FLOAT or (isinstance(info, ScalarType) and info.is_float)]
+            if floats:
+                type_ = types.DEFAULT_FLOAT if floats[0] is _UNTYPED_FLOAT else floats[0]
+                help = ("use '/' for float division, or convert to an integer first: i64(x) // n"
+                        if expr.operator == "//" else
+                        "convert to an integer first: i64(x) % n; a float remainder is not available yet")
+                self._diagnostics.error(codes.INTEGER_OPERATOR, expr.operator_location,
+                                        op=expr.operator, type=type_, help=help)
+                return None
+        if expr.operator == "/" and isinstance(left, _Const) and isinstance(right, _Const):
+            return _UNTYPED_FLOAT  # `7 / 2` is 3.5: the literals become floats
         if isinstance(left, _Const) and isinstance(right, _Const):
             value = _fold(expr.operator, left.value, right.value)
             if value is None:
@@ -465,7 +482,14 @@ class SemanticAnalyzer:
             return _Const(value)
         if not isinstance(left, ScalarType) and not isinstance(right, ScalarType):
             return _UNTYPED_FLOAT  # literals only, at least one of them a float
-        return self._operand_type(expr, expr.operator_location, left, right)
+        type_ = self._operand_type(expr, expr.operator_location, left, right)
+        if expr.operator == "/" and type_ is not None and type_.is_integer:
+            self._diagnostics.error(
+                codes.FLOAT_DIVISION, expr.operator_location, type=type_,
+                help="use '//' for integer division (it rounds down), or divide as floats: f64(a) / f64(b)",
+            )
+            return None
+        return type_
 
     def _truth(self, expr: Expr, scope: Scope, what: str) -> None:
         self._truth_test(expr, self._infer(expr, scope), what)

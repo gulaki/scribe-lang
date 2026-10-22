@@ -2,7 +2,7 @@
 
 Status: **scalars i64, f64, f32 and bool are implemented**, with literals,
 inference, declarations, chained and multiple assignment, casts, checked
-arithmetic, logical operators and comparison chains. To *use* them, read the [language reference](../language.md).
+arithmetic, `/` `//` `%`, logical operators and comparison chains. To *use* them, read the [language reference](../language.md).
 This page records the rules, the reasons for them, and what comes next; items
 marked *planned* do not exist yet.
 
@@ -24,9 +24,11 @@ The type system is built in numbered tasks, each starting from failing tests.
 | 6 | `**` | planned |
 | 7 | `f16`, `f128`, per target | planned |
 | 8 | Range analysis that removes provably safe checks | planned |
+| 9 | `/` divides floats; integer `//` and `%`, rounding down | done |
 
-Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`) and
-`%`. Open: how runtime failures relate to function errors.
+Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`), and
+`//`, `%` and `floor(x)` for floats, together with `**` (they need the C maths
+library). Open: how runtime failures relate to function errors.
 
 ## Scalars
 
@@ -62,9 +64,10 @@ Literals are **untyped**: they take the type their context needs.
 
 **Constant folding.** Integer constant expressions are computed exactly at
 compile time, so only the result has to fit: `-9223372036854775808` and
-`4294967296 * 4294967296 / 4294967296` are fine. Division truncates toward
-zero, as in C (`7 / 2` is 3, `-7 / 2` is -3). An overflowing result (E0503)
-and division by zero (E0504) are compile errors. Float constant expressions
+`4294967296 * 4294967296 // 4294967296` are fine. `//` and `%` fold as they
+run (`-7 // 2` is -4, see [Division](#division)). An overflowing result (E0503)
+and `//` or `%` by zero (E0504) are compile errors. `/` on two integer
+constants is float division: the literals become floats, so `7 / 2` is 3.5. Float constant expressions
 are *not* folded, so `0.1 + 0.2` behaves exactly as it does at run time.
 
 ## Variables
@@ -165,6 +168,36 @@ The result never widens past 64 bits unless an operand already does: f128
 holds every i64 and f64, but quietly moving into software floating point would
 be a surprise.
 
+## Division
+
+Integer and float division are different operations, so they are different
+operators. Which one runs never depends on the types of the operands, which
+are often not visible where the division is written.
+
+| Operator | Operands | Result |
+|---|---|---|
+| `/` | floats, and integer constants (which become floats) | IEEE 754 division: `7 / 2` is 3.5, `1 / 0` is inf |
+| `//` | integers | the quotient rounded toward negative infinity: `-7 // 2` is -4 |
+| `%` | integers | the remainder of `//`: `a == (a // b) * b + a % b`, with the sign of `b` |
+
+- `/` with an integer variable is an error (E0511) whose help offers `//` or
+  `f64(a) / f64(b)`. Making `n / m` an f64 silently, as Python does, would
+  round integers above 2^53 before dividing, which breaks the
+  lossless-or-error rule. So `f64: a = 7 / 2` is 3.5, and `i64: a = 7 / 2`
+  is a type mismatch (E0501), not a silent 3.
+- `//` and `%` on a float are an error (E0510). Float floor division and
+  remainder will come with a small maths library (`floor(x)`, with `**`):
+  `floor(a / b)` is not Python's `a // b` (`1 // 0.1` is 9.0, but
+  `floor(1 / 0.1)` is 10.0), and both need `-lm` when linking.
+- Rounding down, rather than C's truncation, matches Python and gives `%` the
+  sign of the divisor, which is what wrap-around and index arithmetic need.
+  The C helpers `scribe_floordiv_i64` and `scribe_mod_i64` adjust C's
+  truncating `/` and `%` by one step when the remainder is nonzero and the
+  signs differ.
+- Run-time checks: `//` and `%` by zero, and `INT64_MIN // -1`, stop the
+  program. `INT64_MIN % -1` is 0; the helper returns it without evaluating
+  C's `%`, which is undefined for those operands.
+
 ## Casts
 
 A cast is written like a call: `f64(n)`, `i64(x)`, `f32(x)`, `bool(n)`. It will become
@@ -209,7 +242,7 @@ cast, and it never produces a stored bool by itself.
 operands, as Python's do: in a typed language that would make the result's
 type depend on the operand types). The right operand is evaluated only when
 the left one does not decide the answer, which matters today because a
-runtime check is observable: `n == 0 or 10 / n > 1` never divides by zero.
+runtime check is observable: `n == 0 or 10 // n > 1` never divides by zero.
 
 **Comparison chains.** `a < b <= c` means `a < b and b <= c`, with `b`
 evaluated once, as in Python. Every operand of a chain is compared in one
@@ -225,9 +258,9 @@ and another bool. In C each of these gives 0 or 1. `input` cannot read a bool (E
 
 ## Runtime checks
 
-i64 `+ - * /` and negation are checked before the operation and stop the
+i64 `+ - * // %` and negation are checked before the operation and stop the
 program with the Scribe position on failure: overflow, division by zero and
-`INT64_MIN / -1`. Float arithmetic is plain IEEE 754, which C defines
+`INT64_MIN // -1`. Float arithmetic is plain IEEE 754, which C defines
 (`1.0 / 0` is `inf`).
 
 There is **no build mode that turns the checks off**: what a program means

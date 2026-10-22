@@ -18,20 +18,24 @@ The language as it is now is described in [`docs/language.md`](docs/language.md)
 - Explicit declarations: `i64: a, b = 5`.
 - Chained assignment `a = b = 0` and multiple assignment `a, b = b, a`.
 - `bool`, with `true` and `false`, `not`, `and`, `or`. `and` and `or` are
-  short-circuit, so `n == 0 or 10 / n > 1` never divides by zero.
+  short-circuit, so `n == 0 or 10 // n > 1` never divides by zero.
 - Conditions are any bool or integer expression: `while n {`.
 - Comparisons give a `bool`, and chain in one direction: `a < b <= c`.
   Unlike Python, `!=` and mixed directions (`a < b > c`) cannot be chained.
 - `print` of a bool shows `true` or `false`; `input` reads the variable's type.
-- Errors E0109, E0203, E0501–E0509 and E0601–E0602; see
+- `//` integer division and `%` remainder. Both round down, as in Python:
+  `-7 // 2` is -4 and `-7 % 3` is 2.
+- Errors E0109, E0203, E0501–E0511 and E0601–E0602; see
   [`docs/errors.md`](docs/errors.md).
 - [`docs/language.md`](docs/language.md), a language reference whose examples
   are compiled and run by the test suite.
 
 ### Changed (breaking)
 
-- `a = 5` is now an integer, so `7 / 2` is 3, not 3.5. Integers print without
-  decimals (`120`, not `120.00`).
+- `a = 5` is now an integer. Integers print without decimals (`120`, not
+  `120.00`).
+- `/` divides floats: `7 / 2` is 3.5, and `/` on an integer variable is an
+  error. Use `//` for integer division.
 - The type names (`i8` ... `u64`, `f16` ... `f128`, `bool`, `char`, `byte`,
   `str`) and `true`, `false`, `and`, `or`, `not` are reserved words.
 

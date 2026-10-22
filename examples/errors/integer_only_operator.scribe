@@ -1,0 +1,6 @@
+# `//` and `%` work on integers. Use `/` to divide floats, or convert first.
+# expect: E0510 at 5:9
+# expect: E0510 at 6:9
+x = 7.5
+print x // 2
+print 7 % 2.5

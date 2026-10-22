@@ -52,6 +52,15 @@ static inline @T@ @Array@__get(const @Array@ *a, int64_t i) {
 
 User generics are instantiated in the IR: collect reachable `(function, type-args)` pairs from `main`, clone and substitute, name via the table above, deduplicate. Errors are reported against the generic definition (constraints are checked once, not per instantiation). Recursion in instantiation (`f[T]` calling `f[Array[T]]`) gets a depth limit and an error.
 
+## Division (implemented)
+
+| Scribe | C |
+|---|---|
+| `x / y` (floats) | `(v_x / v_y)` |
+| `7 / 2` | `(7.0 / 2.0)`: the integer literals are written as floats |
+| `a // b` | `scribe_floordiv_i64(v_a, v_b, site)`: traps on 0 and `INT64_MIN // -1`, then adjusts C's truncating `/` |
+| `a % b` | `scribe_mod_i64(v_a, v_b, site)`: traps on 0, returns 0 for `b == -1`, then adjusts C's `%` |
+
 ## Booleans and conditions (implemented)
 
 | Scribe | C |

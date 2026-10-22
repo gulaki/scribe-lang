@@ -264,26 +264,62 @@ print f + 2        # 2 becomes an f32
 3.50
 ```
 
-### Constants and division
+### Constants
 
 Integer expressions made only of literals are computed exactly when the
-program is compiled, so only the final value has to fit in an `i64`. Integer
-division truncates toward zero, and float division does not.
+program is compiled, so only the final value has to fit in an `i64`.
 
 ```scribe
-print 7 / 2
-print -7 / 2
-print 7.0 / 2
 print -9223372036854775808
-print 4294967296 * 4294967296 / 4294967296
+print 4294967296 * 4294967296 // 4294967296
 ```
 
 ```output
-3
--3
-3.50
 -9223372036854775808
 4294967296
+```
+
+### Division and remainder
+
+There are three operators, and each one does one thing:
+
+- `/` divides floats. Integer literals become floats, so `7 / 2` is `3.5`.
+  An integer *variable* is an error: write `//`, or convert with
+  `f64(n) / 2`.
+- `//` divides integers and rounds down, toward negative infinity, as in
+  Python: `-7 // 2` is `-4`.
+- `%` is the remainder of `//`, so `a == (a // b) * b + a % b`, and the
+  result has the sign of `b`: `-7 % 3` is `2`, `7 % -3` is `-2`.
+
+```scribe
+print 7 / 2
+f64: half = 1 / 2
+print half
+print 7 // 2
+print -7 // 2
+print -7 % 3
+print 7 % -3
+```
+
+```output
+3.50
+0.50
+3
+-4
+2
+-2
+```
+
+`//` and `%` work only on integers. Dividing an integer by 0 with `//` or `%`
+stops the program; dividing a float by 0 with `/` gives `inf` or `nan`.
+
+```scribe-error
+# expect: E0511 at 4:9
+# expect: E0510 at 6:9
+n = 7
+print n / 2
+x = 7.5
+print x // 2
 ```
 
 ### Mixing types
@@ -386,10 +422,10 @@ program:
 
 ```scribe
 n = 0
-if n == 0 or 10 / n > 1 {
+if n == 0 or 10 // n > 1 {
     print "safe"
 }
-print n != 0 and 10 / n > 1
+print n != 0 and 10 // n > 1
 ```
 
 ```output
@@ -466,14 +502,14 @@ input flag
 From tightest to loosest:
 
 1. unary `-` and `+`
-2. `*` `/`
+2. `*` `/` `//` `%`
 3. `+` `-`
 4. comparisons and chains: `==` `!=` `<` `<=` `>` `>=`
 5. `not`
 6. `and`
 7. `or`
 
-`*`, `/`, `+`, `-`, `and` and `or` group from the left. Parentheses group
+The arithmetic operators, `and` and `or` group from the left. Parentheses group
 explicitly. A value can have only one sign, so write `-(-x)`, not `- -x`.
 
 ## Control flow
@@ -523,9 +559,9 @@ Some mistakes can only be found while the program runs. The program checks
 for them before doing the operation, prints where it happened, and stops
 with a nonzero exit status:
 
-- integer overflow in `+`, `-`, `*`, `/` or negation, including
-  `-9223372036854775808 / -1`;
-- integer division by zero (float division by zero gives `inf` or `nan`);
+- integer overflow in `+`, `-`, `*`, `//` or negation, including
+  `-9223372036854775808 // -1`;
+- `//` or `%` by zero (float division by zero gives `inf` or `nan`);
 - `i64(x)` where `x` is NaN, infinite or out of range.
 
 ```text
@@ -549,7 +585,8 @@ names `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f16`, `f32`,
 | `i8` ... `i32`, `u8` ... `u64` (`char` and `byte` are `u8`) | [next steps](design/type-system.md#status-and-next-steps), task 3 |
 | `**` | task 6 |
 | `f16`, `f128` | task 7 |
-| `%`, wrapping operators (`+%`) | [type-system.md](design/type-system.md#runtime-checks) |
+| `//` and `%` on floats, `floor(x)` | with `**`, task 6 |
+| wrapping operators (`+%`) | [type-system.md](design/type-system.md#runtime-checks) |
 | functions, arrays, strings as values, structs, classes | [whitepaper roadmap](whitepaper.md#4-roadmap) |
 
 ## How a program becomes C
