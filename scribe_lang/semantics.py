@@ -20,7 +20,8 @@ from .types import ScalarType
 # them reach the C compiler. tests/test_semantics.py checks this set against
 # the keyword terminals in the grammar file so the two cannot drift apart.
 RESERVED_WORDS = frozenset(
-    {"print", "input", "if", "elif", "else", "while", "label", "goto"}
+    {"print", "input", "if", "elif", "else", "while", "label", "goto",
+     "true", "false", "and", "or", "not"}
 ) | types.TYPE_NAMES
 
 
