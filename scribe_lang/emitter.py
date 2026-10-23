@@ -157,6 +157,28 @@ static int64_t scribe_mul_i64(int64_t a, int64_t b, int site) {
     return a * b;
 }
 """, includes=["stdint.h"], needs=["scribe_trap"]),
+    # Exponentiation by squaring, every step checked. A double holds integers
+    # exactly only up to 2**53, so `pow` would be wrong here. `base` is squared
+    # only when a later bit needs it, and then the result is at least as large,
+    # so a square that overflows means the result does too.
+    "scribe_pow_i64": _helper("""
+static int64_t scribe_pow_i64(int64_t base, int64_t exp, int site) {
+    if (exp < 0) {
+        scribe_trap(site, "negative exponent");
+    }
+    int64_t result = 1;
+    while (exp > 0) {
+        if (exp % 2 == 1) {
+            result = scribe_mul_i64(result, base, site);
+        }
+        exp = exp / 2;
+        if (exp > 0) {
+            base = scribe_mul_i64(base, base, site);
+        }
+    }
+    return result;
+}
+""", includes=["stdint.h"], needs=["scribe_mul_i64", "scribe_trap"]),
     # `//` and `%` round toward negative infinity, as in Python: C's `/` and
     # `%` truncate, so a nonzero remainder whose sign differs from the
     # divisor's moves one step. INT64_MIN % -1 is undefined in C (the quotient
@@ -346,8 +368,10 @@ def _without_outer_parentheses(text: str) -> str:
 
 _CHECKED_I64 = {
     "+": "scribe_add_i64", "-": "scribe_sub_i64", "*": "scribe_mul_i64",
-    "//": "scribe_floordiv_i64", "%": "scribe_mod_i64",
+    "//": "scribe_floordiv_i64", "%": "scribe_mod_i64", "**": "scribe_pow_i64",
 }
+# C library functions the emitter calls: name -> (header, library to link).
+_LIBRARY = {"pow": ("math.h", "m"), "powf": ("math.h", "m")}
 _READ = {types.I64: "scribe_read_i64", types.F64: "scribe_read_f64", types.F32: "scribe_read_f32"}
 
 
@@ -443,6 +467,13 @@ class CEmitter:
             self._includes.update(helper.includes)
             for dependency in helper.needs:
                 self._use(dependency)
+        return name
+
+    def _library(self, name: str) -> str:
+        """Call the C library function `name`: include its header, link its library."""
+        header, library = _LIBRARY[name]
+        self._includes.add(header)
+        self._libraries.add(library)
         return name
 
     def _site(self, location: SourceLocation) -> int:
@@ -666,6 +697,11 @@ class CEmitter:
             if t.is_integer:
                 helper = self._use(_CHECKED_I64[expr.operator])
                 return f"{helper}({left}, {right}, {self._site(expr.operator_location)})"
+            if expr.operator == "**":
+                # IEEE 754 results (C11 Annex F): inf on overflow, nan for a
+                # negative base and a fractional exponent; never undefined.
+                function = self._library("powf" if t == types.F32 else "pow")
+                return f"{function}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"
             return f"({left} {expr.operator} {right})"
         if isinstance(expr, Cast):
             return self._cast(expr, t)

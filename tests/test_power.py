@@ -139,3 +139,68 @@ def test_power_types(source, name, type_):
 ])
 def test_power_type_errors(source, code, position):
     assert positions(source) == [(code, *position)]
+
+
+# -- emitted C and run time ----------------------------------------------------------
+
+INT64_MIN, INT64_MAX = -2**63, 2**63 - 1
+
+
+@pytest.mark.parametrize("source, fragment", [
+    ("x = 2.5\nprint x ** 2\n", "pow(v_x, 2.0)"),
+    ("x = 2.5f\nprint x ** 0.5\n", "powf(v_x, 0.5f)"),
+    ("x = 2.5f\ny = 2.0\nprint x ** y\n", "pow((double)v_x, v_y)"),
+    ("print 2 ** 0.5\n", "pow(2.0, 0.5)"),
+    ("n = 3\nprint n ** 2\n", "scribe_pow_i64(v_n, INT64_C(2), 0)"),
+])
+def test_power_lowering(compiler, source, fragment):
+    assert fragment in compiler.compile(source).c_source
+
+
+def test_float_powers_link_the_maths_library(compiler):
+    result = compiler.compile("x = 2.0\nprint x ** 0.5\n")
+    assert result.link_libraries == ("m",)
+    assert result.c_source.startswith("/* Link with: -lm */\n#include <stdio.h>\n")
+    assert "#include <math.h>" in result.c_source
+
+
+def test_integer_powers_need_no_library(compiler):
+    result = compiler.compile("n = 3\nprint n ** 2\nprint 2 ** 10\n")
+    assert result.link_libraries == ()
+
+
+@pytest.mark.parametrize("source, output", [
+    ("x = 2.0\nprint x ** 0.5\n", "1.41\n"),
+    ("x = 9.0f\nprint x ** 0.5\n", "3.00\n"),
+    ("x = 2.0\nprint x ** -1\n", "0.50\n"),
+    ("x = 10.0\nprint x ** 400\n", "inf\n"),
+    ("x = 0.0\nprint x ** -1.0\n", "inf\n"),
+    ("x = -8.0\nprint x ** (1 / 3) != x ** (1 / 3)\n", "true\n"),  # NaN
+    ("x = -2.0\nprint x ** 3\n", "-8.00\n"),
+    ("print 2 ** 0.5 * 2 ** 0.5\n", "2.00\n"),
+])
+def test_float_powers(run_scribe, source, output):
+    assert run_scribe(source) == output
+
+
+def test_integer_powers_match_python(run_scribe):
+    bases = [-3, -2, -1, 0, 1, 2, 3, 7, 10]
+    lines, expected = ["i64: b, e"], []
+    for b in bases:
+        for e in range(0, 20):
+            if INT64_MIN <= b ** e <= INT64_MAX:
+                lines += [f"b, e = {b}, {e}", "print b ** e"]
+                expected.append(str(b ** e))
+    lines += ["b, e = -2, 63", "print b ** e", "b, e = 2, 62", "print b ** e", "b, e = -1, 9223372036854775807", "print b ** e"]
+    expected += [str(INT64_MIN), str(2**62), "-1"]
+    assert run_scribe("\n".join(lines) + "\n").split() == expected
+
+
+@pytest.mark.parametrize("program, message", [
+    ("b, e = 2, 63\nprint b ** e\n", "t.scribe:2:9: runtime error: integer overflow\n"),
+    ("b, e = 3037000500, 2\nprint b ** e\n", "t.scribe:2:9: runtime error: integer overflow\n"),
+    ("b, e = 2, -1\nprint b ** e\n", "t.scribe:2:9: runtime error: negative exponent\n"),
+    ("b, e = 1, -1\nprint b ** e\n", "t.scribe:2:9: runtime error: negative exponent\n"),
+])
+def test_integer_power_runtime_errors(run_trapping, program, message):
+    assert run_trapping(program) == message
