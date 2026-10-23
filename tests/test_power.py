@@ -204,3 +204,63 @@ def test_integer_powers_match_python(run_scribe):
 ])
 def test_integer_power_runtime_errors(run_trapping, program, message):
     assert run_trapping(program) == message
+
+
+# -- hardening ------------------------------------------------------------------------
+
+def _random_power_cases(seed, count):
+    """(base, exponent, Python's value) with the value at or near the edge of
+    i64, from both sides."""
+    import random
+
+    rng = random.Random(seed)
+    cases = []
+    while len(cases) < count:
+        base = rng.choice([rng.randint(-40, 40), rng.choice([3037000499, -3037000499, 3037000500, 2097151, 2097152, -2097152, 55108, 6208])])
+        if abs(base) >= 2:
+            # The largest exponent that fits, give or take one.
+            limit = 0
+            while abs(base ** (limit + 1)) <= INT64_MAX:
+                limit += 1
+            exponent = max(0, limit + rng.choice([-1, 0, 0, 1]))
+        else:
+            exponent = rng.randint(0, 100)
+        cases.append((base, exponent, base ** exponent))
+    return cases
+
+
+def test_random_integer_powers_match_python(build_scribe):
+    from conftest import UBSAN_FLAGS
+
+    fits = [(b, e, v) for b, e, v in _random_power_cases(20261023, 400) if INT64_MIN <= v <= INT64_MAX][:250]
+    lines = ["i64: b, e"]
+    for b, e, _ in fits:
+        lines += [f"b, e = {b}, {e}", "print b ** e"]
+    proc = build_scribe("\n".join(lines) + "\n", [*UBSAN_FLAGS, "-Werror"])("")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.split() == [str(v) for _, _, v in fits]
+
+
+@pytest.mark.parametrize("base, exponent", [(b, e) for b, e, v in _random_power_cases(7, 200) if not INT64_MIN <= v <= INT64_MAX][:12])
+def test_random_integer_power_overflow_stops_the_program(run_trapping, base, exponent):
+    assert run_trapping(f"b, e = {base}, {exponent}\nprint b ** e\n") == "t.scribe:2:9: runtime error: integer overflow\n"
+
+
+@pytest.mark.parametrize("source, output", [
+    ("x = 10.0f\nprint x ** 50\n", "inf\n"),       # beyond f32: powf gives inf
+    ("x = 10.0f\nprint f64(x) ** 50\n", "100000000000000007629769841091887003294964970946560.00\n"),
+    ("x = 0.0\nprint x ** 0.0\n", "1.00\n"),
+    ("x = -1.0\nprint x ** 1000001\n", "-1.00\n"),
+    ("x = 4.0\nprint x ** 0.5 ** 2\n", "1.41\n"),     # 4 ** 0.25
+])
+def test_more_float_powers(run_scribe, source, output):
+    assert run_scribe(source) == output
+
+
+def test_power_in_conditions_and_chains(run_scribe):
+    source = "n = 3\nif 2 ** n == 8 and 1 < n ** 2 < 10 {\n    print \"yes\"\n}\n"
+    assert run_scribe(source) == "yes\n"
+
+
+def test_guarded_power_never_runs(run_trapping_or_output):
+    assert run_trapping_or_output("b, e = 2, 63\nprint e < 63 and b ** e > 0\n") == (0, "false\n")
