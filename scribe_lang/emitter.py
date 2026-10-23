@@ -221,6 +221,32 @@ static int64_t scribe_neg_i64(int64_t a, int site) {
     return -a;
 }
 """, includes=["stdint.h"], needs=["scribe_trap"]),
+    # Dividing a float by zero is undefined in ISO C unless the compiler
+    # implements Annex F (C11 6.5.5p5), so it never happens: a zero divisor
+    # gives the IEEE 754 result directly. signbit, isnan, INFINITY and NAN
+    # are macros, so this needs no -lm.
+    "scribe_div_f64": _helper("""
+static double scribe_div_f64(double a, double b) {
+    if (b == 0.0) {
+        if (a == 0.0 || isnan(a)) {
+            return NAN;
+        }
+        return (signbit(a) != 0) != (signbit(b) != 0) ? -INFINITY : INFINITY;
+    }
+    return a / b;
+}
+""", includes=["math.h"]),
+    "scribe_div_f32": _helper("""
+static float scribe_div_f32(float a, float b) {
+    if (b == 0.0f) {
+        if (a == 0.0f || isnan(a)) {
+            return NAN;
+        }
+        return (signbit(a) != 0) != (signbit(b) != 0) ? -INFINITY : INFINITY;
+    }
+    return a / b;
+}
+""", includes=["math.h"]),
     # A float -> integer conversion of a value out of range (or NaN) is
     # undefined (C11 6.3.1.4). NaN fails both comparisons; both bounds are
     # powers of two, so they are exact doubles.
@@ -702,6 +728,9 @@ class CEmitter:
                 # negative base and a fractional exponent; never undefined.
                 function = self._library("powf" if t == types.F32 else "pow")
                 return f"{function}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"
+            if expr.operator == "/" and not self._nonzero_constant(expr.right):
+                helper = self._use("scribe_div_f32" if t == types.F32 else "scribe_div_f64")
+                return f"{helper}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"
             return f"({left} {expr.operator} {right})"
         if isinstance(expr, Cast):
             return self._cast(expr, t)
@@ -720,6 +749,17 @@ class CEmitter:
         if isinstance(expr, ComparisonChain):
             return self._chain(expr)
         raise TypeError(f"Unsupported expression node: {type(expr).__name__}")
+
+    def _nonzero_constant(self, expr: Expr) -> bool:
+        """True if `expr` is a number constant other than zero, so dividing by
+        it is plain C division."""
+        if isinstance(expr, (Grouped, Unary)):
+            return self._nonzero_constant(expr.value if isinstance(expr, Grouped) else expr.operand)
+        if isinstance(expr, FloatLit):
+            # The value C sees: a literal such as 1e-400 rounds to 0.0.
+            return types.round_float(Fraction(expr.text), self._model.type_of(expr)) != 0
+        value = self._model.constant(expr)
+        return value is not None and value != 0
 
     def _cast(self, expr: Cast, target: ScalarType) -> str:
         source = self._model.type_of(expr.operand)

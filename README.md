@@ -188,7 +188,7 @@ Phases never print or raise for mistakes in the program. They report `Diagnostic
 For example, the planned function syntax ([`examples/future/functions.scribe`](examples/future/functions.scribe)) is:
 
 ```text
-fn fib(n: i64) -> i64 {
+fn fib(i64: n) -> i64 {
     if n <= 1 {
         return n
     }

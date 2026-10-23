@@ -1,14 +1,14 @@
-# PROPOSAL (v0.3): explicitly typed functions, recursion, early return.
-# Not supported yet. See docs/design/type-system.md and lowering.md.
+# PROPOSAL (stage M3): explicitly typed functions, recursion, early return.
+# Not supported yet. See docs/design/functions.md and runtime-errors.md.
 
-fn gcd(a: i64, b: i64) -> i64 {
+fn gcd(i64: a, i64: b) -> i64 {     # a and b are local copies
     while b != 0 {
-        a, b = b, a % b       # `%` is planned; division by zero traps
+        a, b = b, a % b
     }
     return a
 }
 
-fn is_prime(n: i64) -> bool {
+fn is_prime(i64: n) -> bool {
     if n < 2 { return false }
     i64: d = 2
     while d * d <= n {
@@ -18,7 +18,7 @@ fn is_prime(n: i64) -> bool {
     return true
 }
 
-fn fact(n: i64) -> i64 {      # checked arithmetic traps on overflow at n = 21
+fn fact(i64: n) -> i64 {      # overflow at n = 21: a runtime error with a traceback
     if n <= 1 { return 1 }
     return n * fact(n - 1)
 }
@@ -26,3 +26,24 @@ fn fact(n: i64) -> i64 {      # checked arithmetic traps on overflow at n = 21
 print gcd(48, 18)             # 6
 print is_prime(97)            # true
 print fact(10)                # 3628800
+
+# A function sees program-level variables only through `global`.
+calls = 0
+
+fn counted_square(i64: x) -> i64 {
+    global calls
+    calls = calls + 1
+    return x ** 2
+}
+
+fn swap_sorted(mut i64: a, mut i64: b) {     # in-out parameters
+    if a > b {
+        a, b = b, a
+    }
+}
+
+print counted_square(4) + counted_square(5)  # 41
+print calls                                  # 2
+lo, hi = 9, 3
+swap_sorted(mut lo, mut hi)                  # `mut` at the call, too
+print lo                                     # 3

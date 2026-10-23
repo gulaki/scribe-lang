@@ -10,6 +10,7 @@ from .build import BuildConfig
 from .compiler import Compiler
 from .diagnostics import Diagnostics
 from .render import render_json, render_text
+from .version import version
 
 # Exit codes. 2 is what argparse uses for a bad command line.
 EXIT_OK = 0
@@ -19,6 +20,7 @@ EXIT_INTERNAL_ERROR = 3
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Scribe-lang compiler powered by Lark")
+    p.add_argument("--version", action="version", version=f"scribe {version()}")
     p.add_argument("source", type=Path)
     p.add_argument("-o", "--output", type=Path, default=Path("out.c"), help="generated C source")
     p.add_argument("--ast", action="store_true", help="print the AST")

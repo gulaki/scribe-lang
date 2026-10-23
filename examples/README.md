@@ -4,7 +4,7 @@
 |---|---|---|
 | `*.scribe` (this folder) | Programs for the language as it exists today. Each has a recorded run in `tests/test_end_to_end.py`. | works |
 | `errors/` | Programs the compiler rejects today. The header lists every error the file must produce, one `# expect: <code> at <line>:<column>` line each (`# expect: E0201 at 3:11`). | works |
-| `future/` | **Proposed** syntax for later versions: more scalar types, functions, overloading, unions, arrays, classes, iterators. | rejected today |
+| `future/` | **Proposed** syntax for later versions: more scalar types, functions (`global`, `mut`), runtime errors and tracebacks, overloading, unions, arrays, classes, iterators. | rejected today |
 | `future/errors/` | Programs the *future* compiler must reject, with the diagnostic we want. | rejected today |
 
 Try them:

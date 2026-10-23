@@ -1,4 +1,4 @@
-# PROPOSAL (v0.4): bounds-checked arrays from one runtime template.
+# PROPOSAL (stage M4): bounds-checked arrays from one runtime template.
 # Array[i64] and Array[f64] are two instantiations of the same audited C
 # template (see docs/design/lowering.md). Users never see a pointer.
 

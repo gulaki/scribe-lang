@@ -1,6 +1,6 @@
 # PROPOSAL: unions must be matched completely.
 #   error: match on `i64 | f64` does not cover `f64`
-fn f(n: i64 | f64) -> i64 {
+fn f(i64 | f64: n) -> i64 {
     match n {
         i64 i => return i
     }

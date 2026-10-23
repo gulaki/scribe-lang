@@ -1,4 +1,4 @@
-# PROPOSAL (v0.7): classes, constructors, methods, scope-based cleanup.
+# PROPOSAL (stage M7): classes, constructors, methods, scope-based cleanup.
 # No pointers are visible. The compiler decides stack vs heap by escape
 # analysis and inserts the frees. See docs/design/memory-model.md.
 
@@ -6,7 +6,7 @@ class Account {
     i64: balance                         # fields are declarations
     str: owner
 
-    fn deposit(mut self, amount: i64) {
+    fn deposit(mut self, i64: amount) {
         require amount > 0               # contract: violation traps, never UB
         self.balance = self.balance + amount
     }
@@ -16,7 +16,7 @@ class Account {
     }
 }
 
-fn open_for(name: str) -> Account {
+fn open_for(str: name) -> Account {
     a = Account(0, name)                 # inferred type; escapes via return
     return a                             # moved out: no copy, no free here
 }

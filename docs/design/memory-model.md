@@ -18,8 +18,8 @@ is always exactly 0 or 1 (see type-system.md, "Booleans"), so a future
 
 | Mode | Meaning | Lowering |
 |---|---|---|
-| (default) | read-only borrow | pass by const pointer, or by value if small |
-| `mut` | exclusive mutable borrow | pass pointer; caller loses access for the call |
+| (default) | a copy, as far as the function can tell: assigning to the parameter never reaches the caller (functions.md §4) | scalars by value; aggregates by const pointer, copied only if the function assigns to them |
+| `mut` | exclusive mutable borrow, written at the call too: `f(mut x)` | pass pointer; caller loses access for the call |
 | `take` | ownership moves in | pass by value; caller may not use it again |
 
 Borrows are **second-class**: they can be passed down the call stack but never stored in a field or array, captured by a closure, or returned. This is the rule that replaces lifetime annotations. To return something, return an owned value.
@@ -36,8 +36,8 @@ Exclusivity is checked: while a `mut` borrow (or a `for` loop's borrow of its co
 
 `struct` is a value; `class` is an identity-bearing reference type. Two stages:
 
-1. **Unique-owner classes (v0.7):** exactly one owner, moved not copied. Covers trees, linked lists without back-edges, resource handles.
-2. **Reference-counted classes (v0.9):** deterministic RC with non-atomic counts (single-threaded v1). Needs a cycle policy decided *first*: either `weak` references that do not own, or a compile-time acyclicity rule per class. We do not ship RC without it, because a leak-by-cycle would break the "no leaks" promise.
+1. **Unique-owner classes (stage M7):** exactly one owner, moved not copied. Covers trees, linked lists without back-edges, resource handles.
+2. **Reference-counted classes (stage M9):** deterministic RC with non-atomic counts (single-threaded v1). Needs a cycle policy decided *first*: either `weak` references that do not own, or a compile-time acyclicity rule per class. We do not ship RC without it, because a leak-by-cycle would break the "no leaks" promise.
 
 Optimisations to add once correct: elide RC traffic on borrows, unique-to-shared promotion on demand, and in-place reuse when a count is 1.
 

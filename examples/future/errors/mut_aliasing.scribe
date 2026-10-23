@@ -1,0 +1,9 @@
+# PROPOSAL: a `mut` argument cannot be passed twice in one call, so a `mut`
+# parameter never aliases another.
+#   error: 'x' is passed as `mut` and cannot be passed again in the same call
+fn add_to(mut i64: target, i64: amount) {
+    target = target + amount
+}
+
+x = 1
+add_to(mut x, x)

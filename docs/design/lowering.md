@@ -28,6 +28,8 @@ All generated names are deterministic and readable.
 | generic `sum_all[i64]` | `f_sum_all__i64` |
 | type `Array[i64]` | `Array__i64`, ops `Array__i64__push` |
 | cleanup labels | `c_1`, `c_2`, ... |
+| result pointer of a function | `r_result` |
+| error exit of a function | `fail` |
 
 Prefix letters keep namespaces disjoint (a variable and a function with the same Scribe name never collide). Mangling must be injective; add a test that lowers a corpus and asserts no two Scribe entities share a C name. Emit `#line` so compiler errors and debuggers show Scribe positions.
 
@@ -56,7 +58,8 @@ User generics are instantiated in the IR: collect reachable `(function, type-arg
 
 | Scribe | C |
 |---|---|
-| `x / y` (floats) | `(v_x / v_y)` |
+| `x / y` (floats) | `scribe_div_f64(v_x, v_y)` (`scribe_div_f32` for f32): ±inf or nan for a zero divisor, without dividing by zero |
+| `x / 2.0` | `(v_x / 2.0)`: a nonzero constant divisor is plain C division |
 | `7 / 2` | `(7.0 / 2.0)`: the integer literals are written as floats |
 | `a // b` | `scribe_floordiv_i64(v_a, v_b, site)`: traps on 0 and `INT64_MIN // -1`, then adjusts C's truncating `/` |
 | `a % b` | `scribe_mod_i64(v_a, v_b, site)`: traps on 0, returns 0 for `b == -1`, then adjusts C's `%` |
@@ -79,6 +82,14 @@ reports the libraries in `CompilationResult.link_libraries`, the C file
 starts with a `/* Link with: -lm */` comment, and the generated Makefile
 (`LDLIBS`) and Ninja file (`libs`) link them after the source file, where
 static linking needs them.
+
+## Functions and errors (proposed)
+
+The calling convention (every function returns a `scribe_err` status and
+writes its result through a pointer), the one-operation-per-statement
+lowering of fallible expressions, and the error exit are specified in
+[functions.md](functions.md#8-evaluation-order-and-lowering) and
+[runtime-errors.md](runtime-errors.md#3-the-c-calling-convention).
 
 ## Booleans and conditions (implemented)
 

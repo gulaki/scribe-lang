@@ -94,6 +94,10 @@ prog.scribe:4:11: runtime error: integer overflow
 
 Warnings, when there are some, will use `W` codes.
 
+*Planned* ([runtime-errors.md](design/runtime-errors.md)): runtime errors get
+codes (`R0001` integer overflow, ...), propagate through function calls with
+a traceback, and end the program with exit status 1 instead of `abort()`.
+
 ## Adding an error
 
 1. Register a code in `scribe_lang/diagnostics.py` (next free number in its

@@ -1,6 +1,6 @@
 # PROPOSAL: every path must return.
 #   error: function `sign` can reach its end without returning an i64
-fn sign(n: i64) -> i64 {
+fn sign(i64: n) -> i64 {
     if n > 0 { return 1 }
     if n < 0 { return -1 }
 }
