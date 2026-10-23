@@ -5,7 +5,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | # | C undefined behaviour | Mechanism | Status |
 |---|---|---|---|
 | 1 | Signed integer overflow | check: `+ - * **` and negation go through helpers that test with ISO C comparisons *before* the operation (CERT INT32-C); constants are folded exactly at compile time; `+%` etc. will wrap via unsigned casts | done for i64 (runtime trap, or E0503 for constants); wrapping operators planned |
-| 2 | Integer division/modulo by zero, `INT_MIN / -1`, and `INT_MIN % -1` | check: `//` and `%` go through helpers that test the operands first; `INT64_MIN % -1` returns 0 without evaluating C's `%` | done for i64 (runtime trap, or E0504 for constants); `/` only divides floats, and float `/ 0` gives IEEE `inf`, defined |
+| 2 | Integer division/modulo by zero, `INT_MIN / -1`, and `INT_MIN % -1` | check: `//` and `%` go through helpers that test the operands first; `INT64_MIN % -1` returns 0 without evaluating C's `%` | done for i64 (runtime trap, or E0504 for constants); `/` only divides floats. Float division by zero is undefined in ISO C without Annex F (C11 6.5.5p5), so it never happens: `scribe_div_f64`/`scribe_div_f32` return ±inf or nan for a zero divisor themselves |
 | 3 | Shift by negative or too-large count | check; shifts take a masked/range-checked count | no shifts |
 | 4 | Out-of-bounds array/string access | check on every index; elided only when proven | no arrays |
 | 5 | Null dereference | absent: no pointers; optional values are `T \| none` and need `match` | n/a |
@@ -28,7 +28,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 22 | Calling a function through a wrong-typed pointer / missing prototype | emit: no function pointers in v1; every function has a prototype | n/a |
 | 23 | Infinite loops without side effects (C11 forward-progress) | emit: C11 6.8.5p6 lets the compiler assume termination only for a loop whose controlling expression is not a constant expression and whose body has no side effects, such as an empty `while n {}`; such loops will get a volatile touch (proposed) | open; `while true` is safe, because `true` is emitted as the constant `1` and C11 6.8.5p6 does not apply to a constant controlling expression |
 | 24 | `scanf` conversion overflow (`%f` out of range is UB) | check: parse with `strtoll`/`strtod`/`strtof` and range-check instead of `scanf` | done: one reader per type; a token that is not a valid value of the type reads as 0 |
-| 25 | Floating-point environment / signalling NaN | emit: default environment; NaN compares as in IEEE (defined) | accepted |
+| 25 | Float exceptional conditions (C11 6.5p5: overflow to inf, `inf - inf`, ...), the floating-point environment, signalling NaN | assumed: Scribe relies on the C compiler's floats behaving as IEEE 754 binary32/binary64 in the default environment. gcc, clang and MSVC do so unless built with `-ffast-math`, although only a compiler that defines `__STDC_IEC_559__` (Annex F) promises it, and Apple clang does not define it. Where it is cheap, Scribe gives the IEEE answer itself instead of relying on C (division by zero, row 2; `f64 -> f32`, row 26) | accepted, documented |
 | 26 | Out-of-range float-to-narrower-float conversion (C11 6.3.1.5), e.g. `(float)1e300` | emit: `f32(x)` rounds as IEEE 754 does (±inf past the f32 range) in a helper, never a plain cast of an out-of-range value; literals are rounded at compile time | done |
 | 27 | Integer types narrower than `int` are promoted to `int` before arithmetic, so `u16 * u16` can overflow `int` | emit: small integer types will compute through helpers in a type wide enough for the result | n/a until i8..u32 exist (planned) |
 | 28 | Integer literal of the wrong type in a variadic call (`printf("%" PRId64, 5)` passes an `int`) | emit: integer constants are written `INT64_C(n)`; INT64_MIN as `(-INT64_C(9223372036854775807) - 1)` | done |
@@ -36,7 +36,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 30 | Testing a float for truth: not undefined, but NaN would count as true and `-0.0` as false | reject: a float condition, `not`/`and`/`or` operand, or `bool(x)` is a compile error (E0505) | done |
 | 31 | Evaluating a guarded operation anyway (`n == 0 or 10 // n > 1`) | emit: `and`/`or` lower to C `&&`/`\|\|`, which evaluate the right operand only when needed (C11 6.5.13, 6.5.14), so a guarded runtime check never runs | done |
 | 32 | A chain evaluating its middle operand twice, or after a comparison failed | emit: a middle operand that is not a name or constant goes into a temporary at its first use (lowering.md) | done |
-| 33 | Math library edge cases (`pow` of a negative number to a fractional power, overflow, `0.0 ** -1.0`) | emit: not undefined: C11 7.12.1 and Annex F give NaN, ±inf or a defined result; integer `**` never calls `pow` | done |
+| 33 | Math library edge cases (`pow` of a negative number to a fractional power, overflow, `0.0 ** -1.0`) | emit: not undefined: C11 7.12.1 makes them domain, pole or range errors with an implementation-defined result, which is the IEEE 754 value (NaN, ±inf) on the compilers of row 25; integer `**` never calls `pow` | done |
 
 ## Known gaps
 

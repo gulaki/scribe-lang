@@ -262,8 +262,10 @@ and another bool. In C each of these gives 0 or 1. `input` cannot read a bool (E
 
 i64 `+ - * // %` and negation are checked before the operation and stop the
 program with the Scribe position on failure: overflow, division by zero and
-`INT64_MIN // -1`. Float arithmetic is plain IEEE 754, which C defines
-(`1.0 / 0` is `inf`).
+`INT64_MIN // -1`. Float arithmetic is IEEE 754: `1.0 / 0` is `inf`. ISO C
+only promises that on compilers that implement Annex F, so float division by
+zero goes through a helper that gives the IEEE result without dividing, and
+the rest relies on the compiler's IEEE floats (ub-catalogue.md rows 2 and 25).
 
 There is **no build mode that turns the checks off**: what a program means
 never depends on compiler flags. Instead:
@@ -285,7 +287,7 @@ type.
 | Operands | Lowering | Failures |
 |---|---|---|
 | integers | `scribe_pow_i64`: squaring, each step through the checked multiply | overflow and a negative exponent stop the program; constants are folded exactly, and a negative constant exponent is E0512 |
-| `f64` | `pow` | none: C11 Annex F defines every case (inf on overflow, nan for a negative base and a fractional exponent, inf for `0.0 ** -1.0`) |
+| `f64` | `pow` | none: C11 7.12.1 makes every case defined, and IEEE 754 compilers give inf on overflow, nan for a negative base and a fractional exponent, and inf for `0.0 ** -1.0` |
 | `f32` | `powf` | as for `f64` |
 
 - Integers never go through `pow`: a double holds integers exactly only up

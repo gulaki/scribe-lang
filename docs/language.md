@@ -245,6 +245,10 @@ print x
 | `f32` | 32-bit IEEE 754 float. |
 | `bool` | `true` or `false`. See [Booleans](#booleans). |
 
+Floats follow IEEE 754, so a result can be `inf` or `nan`. That holds for
+the C compilers in common use, as long as the C is not built with
+`-ffast-math`, which assumes there are no infinities or NaNs.
+
 ### Literals
 
 Numbers use Python's syntax: `1_000_000`, `0x1f`, `0o17`, `0b101`, `2.5`,

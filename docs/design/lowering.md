@@ -58,7 +58,8 @@ User generics are instantiated in the IR: collect reachable `(function, type-arg
 
 | Scribe | C |
 |---|---|
-| `x / y` (floats) | `(v_x / v_y)` |
+| `x / y` (floats) | `scribe_div_f64(v_x, v_y)` (`scribe_div_f32` for f32): ±inf or nan for a zero divisor, without dividing by zero |
+| `x / 2.0` | `(v_x / 2.0)`: a nonzero constant divisor is plain C division |
 | `7 / 2` | `(7.0 / 2.0)`: the integer literals are written as floats |
 | `a // b` | `scribe_floordiv_i64(v_a, v_b, site)`: traps on 0 and `INT64_MIN // -1`, then adjusts C's truncating `/` |
 | `a % b` | `scribe_mod_i64(v_a, v_b, site)`: traps on 0, returns 0 for `b == -1`, then adjusts C's `%` |
