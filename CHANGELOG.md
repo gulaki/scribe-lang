@@ -25,7 +25,12 @@ The language as it is now is described in [`docs/language.md`](docs/language.md)
 - `print` of a bool shows `true` or `false`; `input` reads the variable's type.
 - `//` integer division and `%` remainder. Both round down, as in Python:
   `-7 // 2` is -4 and `-7 % 3` is 2.
-- Errors E0109, E0203, E0501–E0511 and E0601–E0602; see
+- `**`, with Python's precedence: exact and checked on integers, `pow`/`powf`
+  on floats.
+- Headers are included, and libraries linked, only when a program uses them.
+  A program with a float `**` needs `-lm`; its C file says so in a comment, and
+  `--build make`/`--build ninja` add it.
+- Errors E0109, E0203, E0501–E0512 and E0601–E0602; see
   [`docs/errors.md`](docs/errors.md).
 - [`docs/language.md`](docs/language.md), a language reference whose examples
   are compiled and run by the test suite.

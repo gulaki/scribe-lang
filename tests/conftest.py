@@ -59,7 +59,8 @@ def build_scribe(compiler, tmp_path):
         c_file.write_text(result.c_source, encoding="utf-8")
         exe = tmp_path / ("prog.exe" if os.name == "nt" else "prog")
         build = subprocess.run(
-            [C_COMPILER, *STRICT_FLAGS, *flags, "-o", str(exe), str(c_file)],
+            [C_COMPILER, *STRICT_FLAGS, *flags, "-o", str(exe), str(c_file),
+             *(f"-l{lib}" for lib in result.link_libraries)],
             capture_output=True, text=True,
         )
         assert build.returncode == 0, f"{build.stderr}\n--- generated C ---\n{result.c_source}"

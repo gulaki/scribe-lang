@@ -1,6 +1,6 @@
 # Scribe: a safe, readable front end for C
 
-*Design whitepaper, draft 3. The language today has the scalar types i64, f64, f32 and bool, declarations, chained and multiple assignment, `/` `//` `%`, `and`/`or`/`not`, comparison chains, blocks, `if`/`while` and `goto`; [`language.md`](language.md) describes it. Everything else here is a design target.*
+*Design whitepaper, draft 3. The language today has the scalar types i64, f64, f32 and bool, declarations, chained and multiple assignment, `/` `//` `%` `**`, `and`/`or`/`not`, comparison chains, blocks, `if`/`while` and `goto`; [`language.md`](language.md) describes it. Everything else here is a design target.*
 
 ## 1. Thesis
 
@@ -68,7 +68,10 @@ Open: stack depth. Unbounded recursion overflows the C stack, which is not defin
 - Precedence is Python's: `or` < `and` < `not` < comparisons.
 
 ### 2.8 Division
-**Implemented.** Python 3's split, kept strict. `/` is float division: integer constants become floats (`7 / 2` is 3.5), and an integer variable is a compile error rather than a silent conversion that would round above 2^53. `//` and `%` divide integers and round toward negative infinity, as Python's do, so `%` has the sign of the divisor. Which division runs is decided by the operator, never by operand types the reader cannot see: in C, and in Scribe before this change, `f64: a = 7 / 2` quietly stored 3.0. `//` and `%` on floats wait for a maths library (`floor`, with `**`), because the naive `floor(a / b)` is not Python's answer and it needs `-lm`.
+**Implemented.** Python 3's split, kept strict. `/` is float division: integer constants become floats (`7 / 2` is 3.5), and an integer variable is a compile error rather than a silent conversion that would round above 2^53. `//` and `%` divide integers and round toward negative infinity, as Python's do, so `%` has the sign of the divisor. Which division runs is decided by the operator, never by operand types the reader cannot see: in C, and in Scribe before this change, `f64: a = 7 / 2` quietly stored 3.0. `//` and `%` on floats come next: the naive `floor(a / b)` is not Python's answer, and they need `-lm`.
+
+### 2.9 Powers, and only the libraries a program uses
+**Implemented.** `**` has Python's precedence. On integers it is exact and checked (exponentiation by squaring through the checked multiply), never `pow`, because a double is exact only up to 2^53. On floats it is `pow`/`powf`, whose edge cases IEEE 754 defines; they differ from Python, which raises an error or returns a complex number. This is the first feature that needs a C library, so the compiler now tracks what each program uses: headers, `<stdio.h>` included, are added only when needed, and the libraries to link (`-lm`) are reported to the build files and written at the top of the C file. The same mechanism will carry the header and library of every `extern` binding.
 
 ## 3. Pipeline
 
@@ -85,7 +88,7 @@ Today the pipeline is `parse -> AST -> semantics (scopes and types) -> C text`. 
 | Version | Adds | Safety work |
 |---|---|---|
 | 0.1 (done) | float-only, blocks, `goto`, strings in `print` | float literals, `puts`, name prefixes |
-| 0.2 (in progress) | done: `i64`, `f64`, `f32`, `bool`, Python-style literals, declarations, chained and multiple assignment, casts, `/` `//` `%`, `and`/`or`/`not`, conditions as expressions, comparison chains. Next: sized integers, `**`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
+| 0.2 (in progress) | done: `i64`, `f64`, `f32`, `bool`, Python-style literals, declarations, chained and multiple assignment, casts, `/` `//` `%` `**`, `and`/`or`/`not`, conditions as expressions, comparison chains, headers and libraries only when used. Next: sized integers, float `//` and `%`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
 | 0.3 | functions, recursion, `return` | missing-return analysis, stack-depth policy |
 | 0.4 | arrays, strings, `for`, runtime templates | bounds checks, allocation-failure policy |
 | 0.5 | `struct`, value semantics, borrow rules | exclusive access, move checking |

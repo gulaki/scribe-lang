@@ -1,13 +1,12 @@
 # PROPOSAL: the parts of the scalar types that do not exist yet.
-# i64, f64, f32, bool, declarations, chained and multiple assignment, casts
-# and and/or/not work today; see docs/language.md, examples/types.scribe and
+# i64, f64, f32, bool, declarations, chained and multiple assignment, casts,
+# ** and and/or/not work today; see docs/language.md, examples/types.scribe and
 # examples/booleans.scribe.
 
 i32: count = 10, limit          # sized integers
 u8: mask = 0xff
 
 big = i64(count) * 3_000_000_000      # i32 * i64 works in i64
-ratio = f64(count) ** 0.5             # ** lowers to pow
 wrapped = mask +% 1                   # explicit wrapping: 0
 
 if count > 5 {

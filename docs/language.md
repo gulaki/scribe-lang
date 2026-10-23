@@ -35,7 +35,10 @@ echo 5 | build/sum
 ```
 
 `scribe` is installed by `pip install -e .`; `python -m scribe_lang.cli` does
-the same.
+the same. A program that uses a C library function, so far only a float `**`,
+starts its C file with a comment such as `/* Link with: -lm */`: add `-lm`
+at the end of the `cc` command. (`--build make` and `--build ninja` do this
+for you.)
 
 ## Program shape
 
@@ -322,6 +325,44 @@ x = 7.5
 print x // 2
 ```
 
+### Powers
+
+`a ** b` raises `a` to the power `b`. As in Python, it binds more tightly
+than a sign on its left and groups from the right: `-2 ** 2` is `-4`, and
+`2 ** 3 ** 2` is `2 ** 9`.
+
+- On integers the result is exact, and it is checked like `*`: a result
+  that does not fit in an `i64` stops the program. The exponent must not be
+  negative, because the result would not be a whole number: raise a float
+  instead, `2.0 ** -1`.
+- On floats it is C's `pow` (`powf` for `f32`). Special cases follow IEEE
+  754 rather than Python: `0.0 ** -1.0` is `inf`, a negative number to a
+  fractional power is `nan`, and a result too large is `inf`.
+- The operands mix like `+`: `x ** 2` is fine for an `f64` `x`, but an `f64`
+  raised to an `i64` variable needs a cast, `x ** f64(n)`.
+
+```scribe
+print 2 ** 10
+print -2 ** 2
+print 2 ** 3 ** 2
+x = 2.0
+print x ** 0.5
+print x ** -1
+```
+
+```output
+1024
+-4
+512
+1.41
+0.50
+```
+
+```scribe-error
+# expect: E0512 at 2:12
+print 2 ** -1
+```
+
 ### Mixing types
 
 An operator or a comparison on two types works in the smallest type that
@@ -501,16 +542,18 @@ input flag
 
 From tightest to loosest:
 
-1. unary `-` and `+`
-2. `*` `/` `//` `%`
-3. `+` `-`
-4. comparisons and chains: `==` `!=` `<` `<=` `>` `>=`
-5. `not`
-6. `and`
-7. `or`
+1. `**`
+2. unary `-` and `+`
+3. `*` `/` `//` `%`
+4. `+` `-`
+5. comparisons and chains: `==` `!=` `<` `<=` `>` `>=`
+6. `not`
+7. `and`
+8. `or`
 
-The arithmetic operators, `and` and `or` group from the left. Parentheses group
-explicitly. A value can have only one sign, so write `-(-x)`, not `- -x`.
+`**` groups from the right, and its exponent may have a sign (`2.0 ** -1`).
+The other arithmetic operators, `and` and `or` group from the left.
+Parentheses group explicitly. A value can have only one sign, so write `-(-x)`, not `- -x`.
 
 ## Control flow
 
@@ -559,8 +602,9 @@ Some mistakes can only be found while the program runs. The program checks
 for them before doing the operation, prints where it happened, and stops
 with a nonzero exit status:
 
-- integer overflow in `+`, `-`, `*`, `//` or negation, including
+- integer overflow in `+`, `-`, `*`, `//`, `**` or negation, including
   `-9223372036854775808 // -1`;
+- an integer `**` with a negative exponent;
 - `//` or `%` by zero (float division by zero gives `inf` or `nan`);
 - `i64(x)` where `x` is NaN, infinite or out of range.
 
@@ -583,9 +627,9 @@ names `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f16`, `f32`,
 | Feature | Plan |
 |---|---|
 | `i8` ... `i32`, `u8` ... `u64` (`char` and `byte` are `u8`) | [next steps](design/type-system.md#status-and-next-steps), task 3 |
-| `**` | task 6 |
 | `f16`, `f128` | task 7 |
-| `//` and `%` on floats, `floor(x)` | with `**`, task 6 |
+| `//` and `%` on floats | next |
+| `floor(x)`, `sqrt(x)` and other maths functions | with functions and `use math` |
 | wrapping operators (`+%`) | [type-system.md](design/type-system.md#runtime-checks) |
 | functions, arrays, strings as values, structs, classes | [whitepaper roadmap](whitepaper.md#4-roadmap) |
 

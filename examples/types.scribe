@@ -23,3 +23,5 @@ print i64(total)             # back to an integer: truncates toward zero
 print 0x10 + 0o10 + 0b10     # Python-style literals: 16 + 8 + 2
 print 7 // 2                 # integer division rounds down
 print 7 / 2                  # float division
+print 2 ** 10                # exact integer power
+print 2.0 ** 0.5             # pow, from the C maths library

@@ -263,10 +263,11 @@ def test_generated_c_builds_without_any_warning(compiler, tmp_path):
         pytest.skip("no C compiler")
     for example in sorted(EXAMPLES.glob("*.scribe")):
         c_file = tmp_path / f"{example.stem}.c"
-        c_file.write_text(compiler.compile(example.read_text(encoding="utf-8")).c_source, encoding="utf-8")
+        result = compiler.compile(example.read_text(encoding="utf-8"))
+        c_file.write_text(result.c_source, encoding="utf-8")
         build = subprocess.run(
             [C_COMPILER, "-std=c11", "-pedantic-errors", "-Wall", "-Wextra", "-Werror",
-             "-o", str(tmp_path / example.stem), str(c_file)],
+             "-o", str(tmp_path / example.stem), str(c_file), *(f"-l{lib}" for lib in result.link_libraries)],
             capture_output=True, text=True,
         )
         assert build.returncode == 0, f"{example.name}: {build.stderr}"

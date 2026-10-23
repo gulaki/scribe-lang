@@ -61,6 +61,25 @@ User generics are instantiated in the IR: collect reachable `(function, type-arg
 | `a // b` | `scribe_floordiv_i64(v_a, v_b, site)`: traps on 0 and `INT64_MIN // -1`, then adjusts C's truncating `/` |
 | `a % b` | `scribe_mod_i64(v_a, v_b, site)`: traps on 0, returns 0 for `b == -1`, then adjusts C's `%` |
 
+## Powers (implemented)
+
+| Scribe | C |
+|---|---|
+| `n ** 2` (i64) | `scribe_pow_i64(v_n, INT64_C(2), site)`: traps on a negative exponent and on overflow |
+| `x ** 0.5` (f64) | `pow(v_x, 0.5)` |
+| `y ** 0.5` (f32) | `powf(v_y, 0.5f)` |
+
+## Headers and libraries (implemented)
+
+Every header is included only when the program needs it, `<stdio.h>`
+included: `print`, `input` and the runtime-error reporter add it, so a
+program with none of them does not include it. Calling a C library function
+records the library it lives in (`pow` and `powf`: `m`). The compiler
+reports the libraries in `CompilationResult.link_libraries`, the C file
+starts with a `/* Link with: -lm */` comment, and the generated Makefile
+(`LDLIBS`) and Ninja file (`libs`) link them after the source file, where
+static linking needs them.
+
 ## Booleans and conditions (implemented)
 
 | Scribe | C |

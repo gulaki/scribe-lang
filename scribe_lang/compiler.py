@@ -31,6 +31,8 @@ class CompilationResult:
     ast: Program | None = None
     semantic_model: SemanticModel | None = None
     c_source: str | None = None
+    # Libraries to link the C with, such as ("m",) for `-lm`.
+    link_libraries: tuple[str, ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -69,8 +71,9 @@ class Compiler:
         model = self.semantic.analyze(ast, diagnostics)
         if diagnostics.has_errors:
             return result(ast=ast, semantic_model=model)
-        c_source = CEmitter(filename=filename).emit_program(ast, model)
-        return result(ast=ast, semantic_model=model, c_source=c_source)
+        emitter = CEmitter(filename=filename)
+        c_source = emitter.emit_program(ast, model)
+        return result(ast=ast, semantic_model=model, c_source=c_source, link_libraries=emitter.link_libraries)
 
     def write_c(self, source: str, output: str | Path, filename: str | None = None) -> CompilationResult:
         """Compile and, only if that succeeded, write the C file."""
