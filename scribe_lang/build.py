@@ -9,6 +9,12 @@ from pathlib import Path
 class BuildConfig:
     compiler: str = "cc"
     cflags: tuple[str, ...] = ("-std=c11", "-O2", "-Wall", "-Wextra")
+    # Libraries to link, such as ("m",) for the C maths library.
+    libraries: tuple[str, ...] = ()
+
+    @property
+    def ldlibs(self) -> str:
+        return " ".join(f"-l{lib}" for lib in self.libraries)
 
 
 def _relative_to(path: Path, build_file: Path) -> str:
@@ -37,10 +43,11 @@ class MakeBuildSystem(BuildSystem):
         exe = _relative_to(output, build_file)
         return (
             f"CC ?= {config.compiler}\n"
-            f"CFLAGS ?= {flags}\n\n"
+            f"CFLAGS ?= {flags}\n"
+            f"LDLIBS ?={' ' + config.ldlibs if config.ldlibs else ''}\n\n"
             f"all: {exe}\n\n"
             f"{exe}: {src}\n"
-            f"\t$(CC) $(CFLAGS) -o $@ $<\n\n"
+            f"\t$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)\n\n"
             f"clean:\n"
             f"\trm -f {exe}\n"
         )
@@ -55,9 +62,10 @@ class NinjaBuildSystem(BuildSystem):
         exe = _relative_to(output, build_file)
         return (
             f"cc = {config.compiler}\n"
-            f"cflags = {flags}\n\n"
+            f"cflags = {flags}\n"
+            f"libs ={' ' + config.ldlibs if config.ldlibs else ''}\n\n"
             f"rule cc\n"
-            f"  command = $cc $cflags -o $out $in\n"
+            f"  command = $cc $cflags -o $out $in $libs\n"
             f"  description = CC $out\n\n"
             f"build {exe}: cc {src}\n"
         )

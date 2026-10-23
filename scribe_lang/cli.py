@@ -78,7 +78,8 @@ def _run(args, filename: str) -> int:
         build_file = args.build_output or args.output.parent / default_name
         executable = args.output.with_suffix("")
         try:
-            compiler.write_build_file(args.build, args.output, executable, build_file, BuildConfig())
+            config = BuildConfig(libraries=result.link_libraries)
+            compiler.write_build_file(args.build, args.output, executable, build_file, config)
         except OSError as exc:
             print(f"scribe: error: cannot write {build_file}: {exc.strerror or exc}", file=sys.stderr)
             return EXIT_ERRORS
