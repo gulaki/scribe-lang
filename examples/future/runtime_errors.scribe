@@ -1,0 +1,44 @@
+# PROPOSAL (v0.3): runtime errors propagate through the callers to the
+# program, which prints a traceback (text, or JSON with SCRIBE_TRACEBACK=json)
+# and exits with status 1. See docs/design/runtime-errors.md.
+
+fn mean(i64: total, i64: count) -> i64 {
+    return total // count                    # count 0: ZeroDivisionError
+}
+
+fn report(i64: total, i64: count) {
+    print mean(total, count)
+}
+
+# Later: raise, try, except, finally. A bare `except` catches only raised
+# errors; the error of a check is caught only when it is named.
+fn parse_digit(i64: code) -> i64 {
+    if code < 48 or code > 57 {
+        raise ValueError("not a digit")
+    }
+    return code - 48
+}
+
+try {
+    d = parse_digit(65)
+} except ValueError {
+    d = 0
+}
+
+try {
+    report(10, 0)
+} except ZeroDivisionError {
+    print "no data"
+} finally {
+    print "done"
+}
+
+report(10, 0)
+# Traceback (most recent call last):
+#   runtime_errors.scribe:36:1, in <program>
+#     report(10, 0)
+#   runtime_errors.scribe:10:11, in report
+#     print mean(total, count)
+#   runtime_errors.scribe:6:18, in mean
+#     return total // count
+# runtime_errors.scribe:6:18: runtime error[R0002]: division by zero

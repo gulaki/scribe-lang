@@ -631,7 +631,8 @@ names `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f16`, `f32`,
 | `//` and `%` on floats | next |
 | `floor(x)`, `sqrt(x)` and other maths functions | with functions and `use math` |
 | wrapping operators (`+%`) | [type-system.md](design/type-system.md#runtime-checks) |
-| functions, arrays, strings as values, structs, classes | [whitepaper roadmap](whitepaper.md#4-roadmap) |
+| functions, tracebacks, `try`/`except` | draft: [functions.md](design/functions.md), [runtime-errors.md](design/runtime-errors.md) |
+| arrays, strings as values, structs, classes | [whitepaper roadmap](whitepaper.md#4-roadmap) |
 
 ## How a program becomes C
 

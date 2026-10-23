@@ -28,6 +28,8 @@ All generated names are deterministic and readable.
 | generic `sum_all[i64]` | `f_sum_all__i64` |
 | type `Array[i64]` | `Array__i64`, ops `Array__i64__push` |
 | cleanup labels | `c_1`, `c_2`, ... |
+| result pointer of a function | `r_result` |
+| error exit of a function | `fail` |
 
 Prefix letters keep namespaces disjoint (a variable and a function with the same Scribe name never collide). Mangling must be injective; add a test that lowers a corpus and asserts no two Scribe entities share a C name. Emit `#line` so compiler errors and debuggers show Scribe positions.
 
@@ -79,6 +81,14 @@ reports the libraries in `CompilationResult.link_libraries`, the C file
 starts with a `/* Link with: -lm */` comment, and the generated Makefile
 (`LDLIBS`) and Ninja file (`libs`) link them after the source file, where
 static linking needs them.
+
+## Functions and errors (proposed)
+
+The calling convention (every function returns a `scribe_err` status and
+writes its result through a pointer), the one-operation-per-statement
+lowering of fallible expressions, and the error exit are specified in
+[functions.md](functions.md#8-evaluation-order-and-lowering) and
+[runtime-errors.md](runtime-errors.md#3-the-c-calling-convention).
 
 ## Booleans and conditions (implemented)
 

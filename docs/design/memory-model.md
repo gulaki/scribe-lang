@@ -18,8 +18,8 @@ is always exactly 0 or 1 (see type-system.md, "Booleans"), so a future
 
 | Mode | Meaning | Lowering |
 |---|---|---|
-| (default) | read-only borrow | pass by const pointer, or by value if small |
-| `mut` | exclusive mutable borrow | pass pointer; caller loses access for the call |
+| (default) | a copy, as far as the function can tell: assigning to the parameter never reaches the caller (functions.md §4) | scalars by value; aggregates by const pointer, copied only if the function assigns to them |
+| `mut` | exclusive mutable borrow, written at the call too: `f(mut x)` | pass pointer; caller loses access for the call |
 | `take` | ownership moves in | pass by value; caller may not use it again |
 
 Borrows are **second-class**: they can be passed down the call stack but never stored in a field or array, captured by a closure, or returned. This is the rule that replaces lifetime annotations. To return something, return an owned value.

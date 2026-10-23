@@ -12,7 +12,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 6 | Use of uninitialised variable | emit: every variable is zero-initialised (globals and block locals), and a declaration assigns its value or zero every time it runs | done |
 | 7 | Use after free, double free, dangling pointer | absent: no pointers; ownership and second-class borrows (memory-model.md) | n/a |
 | 8 | Memory leak (not UB, but forbidden) | emit: scope-exit frees on every path | n/a |
-| 9 | Unsequenced modifications / unspecified evaluation order | emit: operands with side effects are hoisted to temporaries; every temporary is written once, then read only after a sequence point (`&&`, `\|\|`, `,`) | partly done. No undefined behaviour: expressions only read variables, and a chain temporary (`(v_a < (t_1 = ...)) && (t_1 < v_c)`) is written once and read after `&&`. Statements, multiple-assignment values, `and`/`or` and chains run left to right. **Gap:** the order of the two operands of one operation is C's, which is unspecified, so when both would fail (`a * a + b * b`, both overflowing), which runtime error is reported can depend on the C compiler. Fixing it needs the IR (lowering.md). |
+| 9 | Unsequenced modifications / unspecified evaluation order | emit: operands with side effects are hoisted to temporaries; every temporary is written once, then read only after a sequence point (`&&`, `\|\|`, `,`) | partly done. No undefined behaviour: expressions only read variables, and a chain temporary (`(v_a < (t_1 = ...)) && (t_1 < v_c)`) is written once and read after `&&`. Statements, multiple-assignment values, `and`/`or` and chains run left to right. **Gap:** the order of the two operands of one operation is C's, which is unspecified, so when both would fail (`a * a + b * b`, both overflowing), which runtime error is reported can depend on the C compiler. Fixing it needs the IR: functions.md §8 lowers fallible expressions to one operation per statement, roadmap step F1. |
 | 10 | Strict-aliasing violations | absent: no casts between pointer types; byte access via `memcpy` | n/a |
 | 11 | Out-of-range float-to-int conversion, NaN to int (C11 6.3.1.4) | check in `i64(x)`; constants checked at compile time | done |
 | 12 | `printf`-style format string misuse | emit: strings print through `puts`, never as formats; numbers print through `printf` with a fixed format string | done |
@@ -20,7 +20,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 14 | Name clashes with keywords, libc, reserved identifiers (`__x`, `_X`) | emit: prefixed generated names | done |
 | 15 | Jump past a declaration / into a scope (`goto`, VLAs) | reject (goto into nested block); locals declared at block top | done |
 | 16 | Reading a value whose lifetime ended (returning address of a local) | absent: borrows cannot be returned or stored | n/a |
-| 17 | Stack overflow from deep recursion | check: depth counter, trap at limit (proposed) | no functions |
+| 17 | Stack overflow from deep recursion | check: functions in a call-graph cycle count their depth; past the limit (1,000) the call fails with R0005 and a traceback (runtime-errors.md §6) | no functions |
 | 18 | Allocation failure (`malloc` returns NULL) | check: single allocation wrapper traps | no heap |
 | 19 | Size arithmetic overflow in allocation (`n * sizeof`) | check: overflow-checked multiply in the wrapper | no heap |
 | 20 | Modifying a string literal | absent: literals are immutable values; copies are heap strings | no string values |

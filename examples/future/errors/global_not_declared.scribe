@@ -1,0 +1,8 @@
+# PROPOSAL: a function sees program-level variables only through `global`.
+#   error[E0201]: use of undeclared variable 'total'
+#   note: 'total' is a program-level variable; write `global total` to use it here
+total = 0
+
+fn add(i64: x) {
+    total = total + x
+}

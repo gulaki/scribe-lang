@@ -2,7 +2,7 @@
 # struct plus a `next` function; `for` lowers to a plain C loop over it.
 # Nothing is allocated unless the iterator itself escapes.
 
-iterator evens(limit: i64) -> i64 {
+iterator evens(i64: limit) -> i64 {
     i64: i = 0
     while i < limit {
         yield i                  # lowered to a state machine, no coroutines
@@ -14,7 +14,7 @@ for n in evens(10) {
     print n                      # 0 2 4 6 8
 }
 
-fn sum_all[T: Numeric](items: Iterable[T]) -> T {
+fn sum_all[T: Numeric](Iterable[T]: items) -> T {
     T: total = T.zero
     for item in items { total = total + item }
     return total

@@ -28,7 +28,9 @@ The type system is built in numbered tasks, each starting from failing tests.
 
 Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`);
 `//` and `%` for floats, now that programs can link the C maths library; and
-`floor(x)` and the other maths functions, with function calls and `use math`. Open: how runtime failures relate to function errors.
+`floor(x)` and the other maths functions, with function calls and `use math`.
+Functions themselves are drafted in [functions.md](functions.md) and
+[runtime-errors.md](runtime-errors.md).
 
 ## Scalars
 
@@ -300,8 +302,8 @@ type.
 - Only a program that uses `pow` or `powf` includes `<math.h>` and needs
   `-lm`; see [lowering.md](lowering.md#headers-and-libraries-implemented).
 
-*Open:* how runtime failures relate to function errors once functions exist
-(a trap, or an error value in the signature).
+*Proposed:* every runtime failure, checks included, propagates through the
+callers to `main` with a traceback; see [runtime-errors.md](runtime-errors.md).
 
 ## Inference (local only)
 
@@ -310,19 +312,17 @@ needs an annotation), anything depending on later statements.
 
 ## Functions
 
-```
-fn name(p: T, mut q: U, take r: V) -> R { ... }
-```
-- Parameter modes: default read-only borrow, `mut` exclusive borrow, `take` move.
-- All paths must return (checked); `-> ` omitted means no value.
-- No default or variadic arguments in v1 (they complicate overloading).
+Functions, argument passing, exit analysis and overloading are specified in
+[functions.md](functions.md) (draft): `fn name(T: a, mut U: b) -> R { ... }`,
+with one type per parameter and the types of parameters and results never
+inferred.
 
 ## Overloading
 
-1. Collect candidates by name and arity.
-2. Keep those whose parameter types match exactly. One left: done.
-3. Otherwise allow lossless widening; if exactly one candidate needs the fewest widenings **per parameter** (Pareto-minimal), it wins; if several are incomparable it is an ambiguity error.
-4. Never consult the return type or the expected type.
+The resolution rule (functions.md §7): candidates by name and number of
+arguments; an exact match wins; otherwise the single candidate needing the
+fewest lossless conversions, parameter by parameter; anything else is an
+ambiguity error. The return type is never consulted.
 
 Operators are overloaded functions too. The built-in arithmetic is an overload
 set in a prelude (`+(i64, i64) -> i64`, `**(f32, f32) -> f32` lowering to
@@ -336,4 +336,6 @@ types follow one resolution rule.
 
 ## Generics
 
-`fn f[T: Constraint](x: T)`. Constraints are named capabilities (`Numeric`, `Ordered`, `Iterable[T]`), checked at the definition, not by instantiating and seeing what fails. Instantiated by monomorphisation (lowering.md). No higher-kinded types, no runtime type information.
+*Later, after structs and classes* (whitepaper roadmap, 0.8); the syntax is a
+placeholder, and its order (`T: Constraint`) will be revisited against the
+`type: name` parameters. `fn f[T: Constraint](T: x)`. Constraints are named capabilities (`Numeric`, `Ordered`, `Iterable[T]`), checked at the definition, not by instantiating and seeing what fails. Instantiated by monomorphisation (lowering.md). No higher-kinded types, no runtime type information.

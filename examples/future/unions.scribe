@@ -3,14 +3,14 @@
 
 type Number = i64 | f64
 
-fn double(n: Number) -> Number {
+fn double(Number: n) -> Number {
     match n {
         i64 i => return i * 2
         f64 f => return f * 2.0
     }                          # missing a case would be a compile error
 }
 
-fn parse(text: str) -> i64 | ParseError {
+fn parse(str: text) -> i64 | ParseError {
     # ...
 }
 
