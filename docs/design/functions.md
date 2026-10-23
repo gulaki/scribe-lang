@@ -166,7 +166,7 @@ pay nothing.
 ## 7. Overloading (multiplexing)
 
 Several functions may share a name if their parameter types differ.
-Overloading comes in 0.3, right after plain functions (roadmap F5): `use
+Overloading comes in stage M3, right after plain functions (roadmap F5): `use
 math` (F6) needs it for `pow` on both `f32` and `f64`. Its prerequisites are
 functions and the conversion rule, both already there. Sized integers (task
 3) make it more useful but aren't required.
@@ -304,7 +304,7 @@ Decided (2026-10-23):
    the non-locality explicit (section 2.1).
 3. The recursion limit is 1,000 by default, with `--recursion-limit` to change
    it; tail calls come much later (section 6).
-4. Overloading arrives in 0.3, after plain functions and before `use math`,
+4. Overloading arrives in stage M3, after plain functions and before `use math`,
    which needs it (section 7).
 5. Generics come after structs and classes.
 6. Errors are returned, not aborted (runtime-errors.md §2).

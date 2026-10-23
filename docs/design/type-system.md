@@ -338,6 +338,6 @@ types follow one resolution rule.
 
 ## Generics
 
-*Later, after structs and classes* (whitepaper roadmap, 0.8); the syntax is a
+*Later, after structs and classes* (whitepaper roadmap, stage M8); the syntax is a
 placeholder, and its order (`T: Constraint`) will be revisited against the
 `type: name` parameters. `fn f[T: Constraint](T: x)`. Constraints are named capabilities (`Numeric`, `Ordered`, `Iterable[T]`), checked at the definition, not by instantiating and seeing what fails. Instantiated by monomorphisation (lowering.md). No higher-kinded types, no runtime type information.

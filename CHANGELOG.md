@@ -14,9 +14,12 @@ first number stays 0, and:
   or the package or command is renamed) increases the **second** number;
 - a new feature or a fix that breaks nothing increases the **third** number.
 
-Each pull request merged into `main` is one release. The versions up to 0.5.1
-were worked out afterwards from the commits and pull requests; only 0.0.1 and
-0.1.0 were named at the time. The roadmap's stages (M1, M2, ... in
+Each pull request merged into `main` that changes the compiler is one
+release; one that only changes documentation keeps the version. To release,
+move the "Unreleased" entries under a new `## X.Y.Z - date` heading and write
+the same version in `VERSION.txt` (a test checks that they agree). The
+versions up to 0.5.1 were worked out afterwards from the commits and pull
+requests; only 0.0.1 and 0.1.0 were named at the time. The roadmap's stages (M1, M2, ... in
 [`docs/whitepaper.md`](docs/whitepaper.md#4-roadmap)) are plans, not version
 numbers.
 
@@ -34,6 +37,9 @@ numbers.
   --version` prints it.
 - The roadmap's stages are named M1 to M9 instead of 0.1 to 0.9, so they
   can't be mistaken for versions.
+- Draft specifications for functions and runtime errors with tracebacks
+  ([`docs/design/functions.md`](docs/design/functions.md),
+  [`docs/design/runtime-errors.md`](docs/design/runtime-errors.md)).
 
 ## 0.5.1 - 2026-10-23
 

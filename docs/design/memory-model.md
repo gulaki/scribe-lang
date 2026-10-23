@@ -36,8 +36,8 @@ Exclusivity is checked: while a `mut` borrow (or a `for` loop's borrow of its co
 
 `struct` is a value; `class` is an identity-bearing reference type. Two stages:
 
-1. **Unique-owner classes (v0.7):** exactly one owner, moved not copied. Covers trees, linked lists without back-edges, resource handles.
-2. **Reference-counted classes (v0.9):** deterministic RC with non-atomic counts (single-threaded v1). Needs a cycle policy decided *first*: either `weak` references that do not own, or a compile-time acyclicity rule per class. We do not ship RC without it, because a leak-by-cycle would break the "no leaks" promise.
+1. **Unique-owner classes (stage M7):** exactly one owner, moved not copied. Covers trees, linked lists without back-edges, resource handles.
+2. **Reference-counted classes (stage M9):** deterministic RC with non-atomic counts (single-threaded v1). Needs a cycle policy decided *first*: either `weak` references that do not own, or a compile-time acyclicity rule per class. We do not ship RC without it, because a leak-by-cycle would break the "no leaks" promise.
 
 Optimisations to add once correct: elide RC traffic on borrows, unique-to-shared promotion on demand, and in-place reuse when a count is 1.
 

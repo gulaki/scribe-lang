@@ -1,4 +1,4 @@
-# PROPOSAL (v0.3): overloading on static types. The compiler picks one
+# PROPOSAL (stage M3): overloading on static types. The compiler picks one
 # overload per call site and lowers each to a distinct C function.
 
 fn describe(i64: x) -> str  { return "i64 " + str(x) }

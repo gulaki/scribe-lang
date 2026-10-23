@@ -19,17 +19,17 @@ Each point is stated, then judged: what holds, where the risks are and what we r
 - Rejecting is not enough; **the runtime behaviour on violation must also be defined**. Policy: a violated check (overflow, division by zero, and later array bounds) *traps*: it prints a located message and stops the program (`abort()`, so a nonzero exit status). No silent wraparound, no exceptions in v1. This is how integer overflow, integer division by zero and out-of-range float-to-integer casts behave today.
 - Defence in depth: every program the test suite generates is built with `-std=c11 -pedantic-errors -Wall -Wextra`. The runtime-error tests always build with UBSan, so a check that fires too late shows up as a sanitizer report, and `SCRIBE_SANITIZE=1` builds every run with UBSan. AddressSanitizer joins once there is heap memory to check. The guarantee is only as good as the emitter and the hand-written runtime, so both are tested adversarially.
 - AI-friendliness is a design input: one obvious way to do each thing, locally checkable rules, diagnostics precise enough to feed back into a model.
-- `goto` exists today. It interacts with cleanup (jumping out of a scope must run destructors). Keep it function-local and lower it so cleanups run on every exit edge; revisit whether it survives past v0.5.
+- `goto` exists today. It interacts with cleanup (jumping out of a scope must run destructors). Keep it function-local and lower it so cleanups run on every exit edge; revisit whether it survives past stage M5.
 
 ### 2.2 Explicit typing first, a little inference later
 **Agree, and implemented for scalars.** Inference is *local and one-directional*: a variable's type comes from its first assignment (a literal, a cast, later a constructor call or a function's return type) and never from later uses. No unification, no inference across statements. `x = 3` is an `i64`, `x = 3.0` an `f64`, `x = 2.5f` an `f32`; later, `a = Account(...)` will be an `Account`. Everything else is declared: `i64: x, y = 5`.
 
-**Compatibility (decided).** In v0.1 `7` was a float; now it is an i64. Rather than an edition marker with a legacy float-only mode, the language made the breaking change before 1.0 and the examples were migrated. Numeric rules (implemented): no implicit conversion that could lose a value; implicit widening only where every value converts exactly (`f32` to `f64`); everything else through a cast written like a call, `f64(n)` or `i64(x)`; checked arithmetic by default. Wrapping arithmetic will only be available through visible operators (`+%`, planned). The full rules are in [`type-system.md`](design/type-system.md).
+**Compatibility (decided).** Before version 0.3.0, `7` was a float; now it is an i64. Rather than an edition marker with a legacy float-only mode, the language made the breaking change before 1.0 and the examples were migrated. Numeric rules (implemented): no implicit conversion that could lose a value; implicit widening only where every value converts exactly (`f32` to `f64`); everything else through a cast written like a call, `f64(n)` or `i64(x)`; checked arithmetic by default. Wrapping arithmetic will only be available through visible operators (`+%`, planned). The full rules are in [`type-system.md`](design/type-system.md).
 
 ### 2.3 Typed functions with unions and overloading
 **Agree with caution: this is the riskiest combination.** Unions plus overloading plus implicit widening produces ambiguity quickly. Proposal:
 
-- Overloading resolves **statically** on exact argument types; then on lossless widening; ambiguity is a compile error (see `examples/future/errors/ambiguous_overload.scribe` and [functions.md](design/functions.md#7-overloading-multiplexing)). It is planned with functions in 0.3.
+- Overloading resolves **statically** on exact argument types; then on lossless widening; ambiguity is a compile error (see `examples/future/errors/ambiguous_overload.scribe` and [functions.md](design/functions.md#7-overloading-multiplexing)). It is planned with functions in stage M3.
 - Unions are **tagged** sum types. The only way to look inside is `match`, and `match` must be exhaustive.
 - A union argument to an overloaded call is accepted only if *every* member resolves; the compiler then emits the dispatch switch. Otherwise it is an error. This gives unions and overloading one clear interaction instead of a pile of special cases.
 - Return types are never used to pick an overload.
@@ -53,7 +53,7 @@ Text-level C templating (macros or string substitution) is cheap to start with b
 - Function parameters are **borrowed by default** (read-only; `mut` for exclusive write access; `take` to move ownership in). Borrows are **second-class**: they may be passed down, but not stored in a field, captured, or returned. That single rule removes dangling references with no lifetime syntax.
 - Exclusive access is checked: you cannot mutate a collection while an iterator borrows it. This kills iterator invalidation.
 - Heap placement is **inferred**: values that don't escape live on the stack; escaping values get a unique owner and a compiler-inserted free on every exit path (including early `return`, `goto` and traps-that-clean-up).
-- `class` means a *shared* reference type. Introduce it only with **deterministic reference counting**, which handles shared ownership without a GC. Cycles are the known hole: forbid by construction (weak references, or an acyclicity check) before shipping classes. Until then, v0.7 classes can be unique-owner only.
+- `class` means a *shared* reference type. Introduce it only with **deterministic reference counting**, which handles shared ownership without a GC. Cycles are the known hole: forbid by construction (weak references, or an acyclicity check) before shipping classes. Until then, stage M7 classes can be unique-owner only.
 
 Open: stack depth. Unbounded recursion overflows the C stack, which is not defined behaviour we can check cheaply. See open questions.
 
@@ -85,17 +85,19 @@ Today the pipeline is `parse -> AST -> semantics (scopes and types) -> C text`. 
 
 ## 4. Roadmap
 
-| Version | Adds | Safety work |
+| Stage | Adds | Safety work |
 |---|---|---|
-| 0.1 (done) | float-only, blocks, `goto`, strings in `print` | float literals, `puts`, name prefixes |
-| 0.2 (in progress) | done: `i64`, `f64`, `f32`, `bool`, Python-style literals, declarations, chained and multiple assignment, casts, `/` `//` `%` `**`, `and`/`or`/`not`, conditions as expressions, comparison chains, headers and libraries only when used. Next: sized integers, float `//` and `%`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
-| 0.3 | typed IR, runtime errors that propagate with tracebacks, functions, `return`, recursion, overloading, `use math`; see [functions.md](design/functions.md#10-roadmap) | strict evaluation order, exit analysis, recursion limit, ambiguity errors |
-| 0.4 | arrays, strings, `for`, runtime templates | bounds checks, allocation-failure policy |
-| 0.5 | `struct`, value semantics, borrow rules | exclusive access, move checking |
-| 0.6 | unions, `match` | exhaustiveness |
-| 0.7 | `class`, RAII, escape analysis | ownership of heap objects |
-| 0.8 | generics, iterators | constraints checked at the definition, invalidation rules |
-| 0.9 | reference counting | cycle policy |
+| M1 (done) | float-only, blocks, `goto`, strings in `print` | float literals, `puts`, name prefixes |
+| M2 (in progress) | done: `i64`, `f64`, `f32`, `bool`, Python-style literals, declarations, chained and multiple assignment, casts, `/` `//` `%` `**`, `and`/`or`/`not`, conditions as expressions, comparison chains, headers and libraries only when used. Next: sized integers, float `//` and `%`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
+| M3 | typed IR, runtime errors that propagate with tracebacks, functions, `return`, recursion, overloading, `use math`; see [functions.md](design/functions.md#10-roadmap) | strict evaluation order, exit analysis, recursion limit, ambiguity errors |
+| M4 | arrays, strings, `for`, runtime templates | bounds checks, allocation-failure policy |
+| M5 | `struct`, value semantics, borrow rules | exclusive access, move checking |
+| M6 | unions, `match` | exhaustiveness |
+| M7 | `class`, RAII, escape analysis | ownership of heap objects |
+| M8 | generics, iterators | constraints checked at the definition, invalidation rules |
+| M9 | reference counting | cycle policy |
+
+Stages are plans, not versions: released versions and what each one changed are in [`CHANGELOG.md`](../CHANGELOG.md), and stage M2 so far spans versions 0.3.0 to 0.5.1.
 
 Order rationale: types before functions (signatures need them), arrays before structs (forces the runtime-template and heap machinery early, on the simplest type), functions with their error model before any heap type (cleanups need the error exits), ownership and classes before generics (generics over owned types are the hard case).
 

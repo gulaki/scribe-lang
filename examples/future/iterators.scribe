@@ -1,4 +1,4 @@
-# PROPOSAL (v0.8): iterators and generics. An iterator is a small state
+# PROPOSAL (stage M8): iterators and generics. An iterator is a small state
 # struct plus a `next` function; `for` lowers to a plain C loop over it.
 # Nothing is allocated unless the iterator itself escapes.
 

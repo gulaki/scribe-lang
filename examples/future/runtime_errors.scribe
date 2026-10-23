@@ -1,4 +1,4 @@
-# PROPOSAL (v0.3): runtime errors propagate through the callers to the
+# PROPOSAL (stage M3): runtime errors propagate through the callers to the
 # program, which prints a traceback (text, or JSON with SCRIBE_TRACEBACK=json)
 # and exits with status 1. See docs/design/runtime-errors.md.
 

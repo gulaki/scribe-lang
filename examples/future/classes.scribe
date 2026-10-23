@@ -1,4 +1,4 @@
-# PROPOSAL (v0.7): classes, constructors, methods, scope-based cleanup.
+# PROPOSAL (stage M7): classes, constructors, methods, scope-based cleanup.
 # No pointers are visible. The compiler decides stack vs heap by escape
 # analysis and inserts the frees. See docs/design/memory-model.md.
 

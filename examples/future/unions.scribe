@@ -1,4 +1,4 @@
-# PROPOSAL (v0.6): tagged unions and exhaustive match.
+# PROPOSAL (stage M6): tagged unions and exhaustive match.
 # A union is a C struct { tag; union { ... } }; the tag is always checked.
 
 type Number = i64 | f64
