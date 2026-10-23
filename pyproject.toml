@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scribe-lang"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Scribe language compiler implemented with Python and Lark"
 requires-python = ">=3.10"
 dependencies = ["lark>=1.1,<2"]
@@ -17,6 +17,9 @@ testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
 include = ["scribe_lang*"]
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION.txt"}
 
 [tool.setuptools.package-data]
 scribe_lang = ["grammar/*.lark"]
