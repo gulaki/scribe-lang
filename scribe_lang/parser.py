@@ -139,6 +139,10 @@ class ASTBuilder(Transformer):
     def term(self, items):
         return _fold_binary(items)
 
+    def power(self, items):
+        base, op, exponent = items
+        return Binary(base, "**", exponent, base.location, _loc(op))
+
     def unary(self, items):
         if len(items) == 1:
             return items[0]
@@ -178,6 +182,9 @@ class ASTBuilder(Transformer):
         return token
 
     def MUL_OP(self, token):
+        return token
+
+    def POW_OP(self, token):
         return token
 
     def SIGN(self, token):
@@ -349,6 +356,7 @@ _TERMINAL_WORDS = {
     "COMP_OP": "a comparison operator",
     "ADD_OP": "an operator",
     "MUL_OP": "an operator",
+    "POW_OP": "an operator",
     "SIGN": "'+' or '-'",
 }
 _KEYWORDS = {
@@ -358,7 +366,7 @@ _KEYWORDS = {
 
 # When every terminal of a group is expected, say the group's name instead.
 _GROUPS = [
-    ("an operator", {"ADD_OP", "MUL_OP", "COMP_OP", "AND", "OR"}),
+    ("an operator", {"ADD_OP", "MUL_OP", "POW_OP", "COMP_OP", "AND", "OR"}),
     ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "I64", "F32", "F64", "BOOL"}),
     ("an expression", {
         "INT_LIT", "FLOAT_LIT", "IDENT", "LPAR", "SIGN", "I64", "F32", "F64", "BOOL", "TRUE", "FALSE", "NOT",
@@ -402,7 +410,7 @@ def describe_token(token: Token) -> str:
     if token.type in _KEYWORDS:
         return f"'{token}'"
     word = _TERMINAL_WORDS.get(token.type)
-    if word is not None and token.type not in ("COMP_OP", "ADD_OP", "MUL_OP", "SIGN"):
+    if word is not None and token.type not in ("COMP_OP", "ADD_OP", "MUL_OP", "POW_OP", "SIGN"):
         return word
     return f"'{token}'"
 

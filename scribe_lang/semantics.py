@@ -139,6 +139,8 @@ def _fold(op: str, a: int, b: int) -> int | None:
         return a - b
     if op == "*":
         return a * b
+    if op == "**":
+        return a ** b  # b >= 0 and small enough, checked by the caller
     if b == 0:
         return None
     if op == "//":
@@ -197,6 +199,8 @@ class SemanticAnalyzer:
       value has to fit (`-9223372036854775808` is fine).
     * A binary operator works in `types.common_type` of its operands, and it
       is an error if there is none: i64 and f64 need an explicit cast.
+    * `**` works in the common type of its operands, like `+`. An integer
+      power needs an exponent of 0 or more.
     * `/` divides floats; constants become floats (`7 / 2` is 3.5) and an
       integer operand is an error. `//` and `%` work on integers only,
       rounding toward negative infinity.
@@ -474,6 +478,20 @@ class SemanticAnalyzer:
                 return None
         if expr.operator == "/" and isinstance(left, _Const) and isinstance(right, _Const):
             return _UNTYPED_FLOAT  # `7 / 2` is 3.5: the literals become floats
+        if expr.operator == "**" and isinstance(left, _Const) and isinstance(right, _Const):
+            base, exponent = left.value, right.value
+            if exponent < 0:
+                self._diagnostics.error(
+                    codes.NEGATIVE_EXPONENT, expr.right.location, exponent=exponent,
+                    help=f"for a fraction, raise a float: {base}.0 ** {exponent}",
+                )
+                return None
+            # |base ** exponent| >= 2 ** ((bits - 1) * exponent): past 2 ** 16384
+            # nothing can hold it (not even a future f128), so do not compute it.
+            if abs(base) >= 2 and (abs(base).bit_length() - 1) * exponent > 16384:
+                self._diagnostics.error(codes.CONSTANT_OVERFLOW, expr.location,
+                                        value=f"{base} ** {exponent}", type="any type")
+                return None
         if isinstance(left, _Const) and isinstance(right, _Const):
             value = _fold(expr.operator, left.value, right.value)
             if value is None:

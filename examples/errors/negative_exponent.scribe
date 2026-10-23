@@ -1,0 +1,4 @@
+# An integer power needs an exponent of 0 or more: 2 ** -1 is not an integer.
+# Raise a float instead: 2.0 ** -1 is 0.5.
+# expect: E0512 at 4:12
+print 2 ** -1

@@ -66,6 +66,7 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0509 | cannot-input-type | `input` into a bool. Read an i64 and convert it: `bool(n)`. |
 | E0510 | integer-only-operator | `//` or `%` on a float. They work on integers only. Divide floats with `/`, or convert first: `i64(x) // 2`. A float remainder is not available yet. |
 | E0511 | float-only-division | `/` on integers. `/` divides floats, so `7 / 2` is 3.5; for whole-number division use `//`, which rounds down, or convert: `f64(a) / f64(b)`. |
+| E0512 | negative-exponent | An integer constant raised to a negative power, such as `2 ** -1`. The result would not be an integer; raise a float instead: `2.0 ** -1` is 0.5. |
 | E0601 | assignment-count-mismatch | A multiple assignment has a different number of names and values, such as `a, b = 1` or `a = 1, 2`. |
 | E0602 | duplicate-assignment-target | A chained or multiple assignment names the same variable twice, such as `a = b = a = 0` or `a, a = 1, 2`. A note points at the first one. |
 

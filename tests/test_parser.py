@@ -229,7 +229,7 @@ def test_parse_without_a_collector_raises_with_the_diagnostics():
     ({"_NL", "SEMICOLON", "$END"}, "end of line"),
     ({"$END"}, "end of file"),
     ({"ELSE"}, "'else'"),
-    ({"ADD_OP", "MUL_OP", "COMP_OP", "AND", "OR"}, "an operator"),
+    ({"ADD_OP", "MUL_OP", "POW_OP", "COMP_OP", "AND", "OR"}, "an operator"),
     ({"SOME_NEW_TERMINAL"}, "SOME_NEW_TERMINAL"),
 ])
 def test_describe_expected(expected, words):
