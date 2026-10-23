@@ -4,7 +4,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 
 | # | C undefined behaviour | Mechanism | Status |
 |---|---|---|---|
-| 1 | Signed integer overflow | check: `+ - *` and negation go through helpers that test with ISO C comparisons *before* the operation (CERT INT32-C); constants are folded exactly at compile time; `+%` etc. will wrap via unsigned casts | done for i64 (runtime trap, or E0503 for constants); wrapping operators planned |
+| 1 | Signed integer overflow | check: `+ - * **` and negation go through helpers that test with ISO C comparisons *before* the operation (CERT INT32-C); constants are folded exactly at compile time; `+%` etc. will wrap via unsigned casts | done for i64 (runtime trap, or E0503 for constants); wrapping operators planned |
 | 2 | Integer division/modulo by zero, `INT_MIN / -1`, and `INT_MIN % -1` | check: `//` and `%` go through helpers that test the operands first; `INT64_MIN % -1` returns 0 without evaluating C's `%` | done for i64 (runtime trap, or E0504 for constants); `/` only divides floats, and float `/ 0` gives IEEE `inf`, defined |
 | 3 | Shift by negative or too-large count | check; shifts take a masked/range-checked count | no shifts |
 | 4 | Out-of-bounds array/string access | check on every index; elided only when proven | no arrays |
@@ -36,6 +36,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 30 | Testing a float for truth: not undefined, but NaN would count as true and `-0.0` as false | reject: a float condition, `not`/`and`/`or` operand, or `bool(x)` is a compile error (E0505) | done |
 | 31 | Evaluating a guarded operation anyway (`n == 0 or 10 // n > 1`) | emit: `and`/`or` lower to C `&&`/`\|\|`, which evaluate the right operand only when needed (C11 6.5.13, 6.5.14), so a guarded runtime check never runs | done |
 | 32 | A chain evaluating its middle operand twice, or after a comparison failed | emit: a middle operand that is not a name or constant goes into a temporary at its first use (lowering.md) | done |
+| 33 | Math library edge cases (`pow` of a negative number to a fractional power, overflow, `0.0 ** -1.0`) | emit: not undefined: C11 7.12.1 and Annex F give NaN, ±inf or a defined result; integer `**` never calls `pow` | done |
 
 ## Known gaps
 

@@ -62,6 +62,7 @@ if low + high >= 32 {
     print "small"
 }
 print 7 // 2               # integer division rounds down
+print 2 ** 10              # exact integer power
 in_range = 0 < a <= 100    # a comparison chain gives a bool
 print in_range and not (a == 0)
 ```
@@ -71,6 +72,7 @@ print in_range and not (a == 0)
 27.50
 big
 3
+1024
 true
 ```
 

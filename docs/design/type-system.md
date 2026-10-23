@@ -2,7 +2,7 @@
 
 Status: **scalars i64, f64, f32 and bool are implemented**, with literals,
 inference, declarations, chained and multiple assignment, casts, checked
-arithmetic, `/` `//` `%`, logical operators and comparison chains. To *use* them, read the [language reference](../language.md).
+arithmetic, `/` `//` `%` `**`, logical operators and comparison chains. To *use* them, read the [language reference](../language.md).
 This page records the rules, the reasons for them, and what comes next; items
 marked *planned* do not exist yet.
 
@@ -21,14 +21,14 @@ The type system is built in numbered tasks, each starting from failing tests.
 | 3 | `i8` ... `i32`, `u8` ... `u64` (`char`, `byte` = `u8`), the full promotion table | next |
 | 4 | Explicit declarations `i64: a, b = 5` | done |
 | 5 | Chained `a = b = 0` and multiple `a, b = b, a` assignment | done |
-| 6 | `**` | planned |
+| 6 | `**`: checked integer powers, `pow`/`powf` for floats; headers and `-lm` only when used | done |
 | 7 | `f16`, `f128`, per target | planned |
 | 8 | Range analysis that removes provably safe checks | planned |
 | 9 | `/` divides floats; integer `//` and `%`, rounding down | done |
 
-Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`), and
-`//`, `%` and `floor(x)` for floats, together with `**` (they need the C maths
-library). Open: how runtime failures relate to function errors.
+Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`);
+`//` and `%` for floats, now that programs can link the C maths library; and
+`floor(x)` and the other maths functions, with function calls and `use math`. Open: how runtime failures relate to function errors.
 
 ## Scalars
 
@@ -274,8 +274,31 @@ never depends on compiler flags. Instead:
 - failed checks go through a single `scribe_trap` function, so embedded
   targets can replace what a failure does (log and reset instead of abort).
 
-*Planned:* `**`, which lowers to `powf`/`pow` for floats and to checked
-repeated squaring for integers (a negative integer exponent is an error).
+## Powers
+
+`a ** b` binds tighter than a sign on its left and groups from the right, as
+in Python (`-2 ** 2` is -4). Its operands mix like `+`'s, in their common
+type.
+
+| Operands | Lowering | Failures |
+|---|---|---|
+| integers | `scribe_pow_i64`: squaring, each step through the checked multiply | overflow and a negative exponent stop the program; constants are folded exactly, and a negative constant exponent is E0512 |
+| `f64` | `pow` | none: C11 Annex F defines every case (inf on overflow, nan for a negative base and a fractional exponent, inf for `0.0 ** -1.0`) |
+| `f32` | `powf` | as for `f64` |
+
+- Integers never go through `pow`: a double holds integers exactly only up
+  to 2^53.
+- `f64 ** n` with an `i64` `n` is E0502, like `f64 + n`. Converting the
+  exponent silently could round an odd exponent above 2^53 to an even one and
+  flip the sign of `(-1.0) ** n`.
+- `powl` is not used: `long double` is not a Scribe type and differs between
+  targets (80 bits on x86, 64 on Apple arm64 and MSVC). `f128` will need
+  `powf128` or a quad-precision library, per target.
+- Float powers of constants are not folded, like every float constant
+  expression, so `2 ** 0.5` is computed by the C library at run time. C
+  libraries may differ in the last bit of `pow`.
+- Only a program that uses `pow` or `powf` includes `<math.h>` and needs
+  `-lm`; see [lowering.md](lowering.md#headers-and-libraries-implemented).
 
 *Open:* how runtime failures relate to function errors once functions exist
 (a trap, or an error value in the signature).
