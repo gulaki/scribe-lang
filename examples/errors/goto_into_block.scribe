@@ -1,4 +1,7 @@
-# expect: E0303 at 2:1
+# `goto` and `label` are deprecated, so each one also warns (W0001).
+# expect: W0001 at 5:1
+# expect: E0303 at 5:1
+# expect: W0001 at 7:5
 goto inside
 {
     label inside

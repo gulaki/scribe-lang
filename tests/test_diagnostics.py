@@ -79,5 +79,5 @@ def test_every_code_is_documented():
     from pathlib import Path
 
     doc = (Path(__file__).resolve().parent.parent / "docs" / "errors.md").read_text(encoding="utf-8")
-    rows = set(re.findall(r"^\| (E\d{4}) \| ([a-z-]+) \|", doc, re.MULTILINE))
+    rows = set(re.findall(r"^\| ([EW]\d{4}) \| ([a-z-]+) \|", doc, re.MULTILINE))
     assert rows == {(code.code, code.name) for code in d.CODES.values()}

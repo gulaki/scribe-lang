@@ -580,24 +580,24 @@ if score >= 90 {
 B
 ```
 
-`label name` marks a place and `goto name` jumps to it. Labels share one
-namespace for the whole program. A `goto` may jump within its own block or
-out to an enclosing one, but never into a nested block.
+### Deprecated: `goto` and `label`
 
-```scribe
+`label name` marks a place and `goto name` jumps to it. Both still work, but
+they are deprecated and will be removed in a future version: every `label`
+and `goto` gives warning W0001. Use `break` and `continue`, with a loop name
+for an outer loop, instead. Until then, labels share one namespace for the
+whole program, and a `goto` may jump within its own block or out to an
+enclosing one, but never into a nested block.
+
+```scribe-error
+# expect: W0001 at 4:1
+# expect: W0001 at 7:5
 i = 1
 label again
-print i
 i = i + 1
 if i <= 3 {
     goto again
 }
-```
-
-```output
-1
-2
-3
 ```
 
 ## Runtime errors

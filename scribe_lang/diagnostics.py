@@ -47,7 +47,7 @@ def _register(code: str, name: str, template: str, severity: Severity = Severity
 # Codes are grouped by hundreds and never reused or renumbered once released.
 #   E00xx  driver and internal   E01xx  syntax       E02xx  names and scopes
 #   E03xx  control flow          E04xx  literals     E05xx  types
-#   E06xx  assignments
+#   E06xx  assignments           W00xx  warnings
 
 INTERNAL_ERROR = _register("E0001", "internal-error", "internal compiler error: {detail}")
 CANNOT_READ_SOURCE = _register("E0002", "cannot-read-source", "cannot read {path}: {reason}")
@@ -104,6 +104,11 @@ ASSIGNMENT_COUNT_MISMATCH = _register(
 )
 DUPLICATE_TARGET = _register(
     "E0602", "duplicate-assignment-target", "'{name}' is assigned more than once in one statement",
+)
+
+DEPRECATED_GOTO = _register(
+    "W0001", "deprecated-goto", "'{keyword}' is deprecated and will be removed in a future version",
+    Severity.WARNING,
 )
 
 
@@ -176,8 +181,9 @@ class Diagnostics:
         self._items.append(diagnostic)
         return diagnostic
 
-    # Most call sites report errors; the name reads better there.
+    # The severity comes from the code; these names read better at call sites.
     error = report
+    warning = report
 
     def _span(self, where: SourceLocation | Span | None) -> Span:
         if isinstance(where, Span):

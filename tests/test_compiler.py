@@ -50,9 +50,11 @@ def test_integer_constant_expressions_are_folded():
 
 
 def error_codes(source):
+    """The codes of the errors; warnings (such as W0001 for goto) are left
+    out."""
     result = COMPILER.compile(source)
     assert not result.ok
-    return [d.code.code for d in result.diagnostics]
+    return [d.code.code for d in result.errors]
 
 
 def test_undeclared_read_is_rejected():
@@ -113,7 +115,7 @@ def test_diagnostics_are_in_source_order():
     # gotos are checked after the whole program has been read.
     result = COMPILER.compile("goto nowhere\nprint a\nprint b\n")
     assert [(d.code.code, d.span.line) for d in result.diagnostics] == [
-        ("E0301", 1), ("E0201", 2), ("E0201", 3),
+        ("W0001", 1), ("E0301", 1), ("E0201", 2), ("E0201", 3),
     ]
 
 

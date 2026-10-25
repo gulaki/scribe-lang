@@ -1,4 +1,5 @@
-"""`break`, `continue` and named loops (docs/language.md, "Leaving a loop")."""
+"""`break`, `continue` and named loops (docs/language.md, "Leaving a loop"),
+and the deprecation of `goto` and `label`."""
 import pytest
 
 from scribe_lang.ast import Break, Continue, While
@@ -102,6 +103,19 @@ def test_sibling_loops_may_share_a_name():
 
 def test_a_loop_name_is_checked_against_reserved_words():
     assert positions("while true as print {\n}\n") == [("E0202", 1, 15)]
+
+
+# -- deprecation of goto and label ----------------------------------------------------------
+
+def test_goto_and_label_are_deprecated():
+    found = analyze("label top\ngoto top\n")
+    assert [(d.code.code, d.span.line, d.span.column) for d in found] == [("W0001", 1, 1), ("W0001", 2, 1)]
+    assert all(not d.is_error for d in found)
+    assert "deprecated" in found[0].message and "break" in found[0].help
+
+
+def test_a_deprecated_program_still_compiles(run_scribe):
+    assert run_scribe("i = 1\nlabel again\nprint i\ni = i + 1\nif i <= 2 {\n    goto again\n}\n") == "1\n2\n"
 
 
 # -- emitted C and run time ----------------------------------------------------------

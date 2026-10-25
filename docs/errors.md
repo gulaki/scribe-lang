@@ -95,11 +95,18 @@ prog.scribe:4:11: runtime error: integer overflow
 | `negative exponent` | An i64 `**` whose exponent is negative: the result would not be an integer. Raise a float instead: `2.0 ** -1`. |
 | `value out of range for i64` | `i64(x)` where `x` is NaN, infinite, or outside the range of i64. |
 
-Warnings, when there are some, will use `W` codes.
-
 *Planned* ([runtime-errors.md](design/runtime-errors.md)): runtime errors get
 codes (`R0001` integer overflow, ...), propagate through function calls with
 a traceback, and end the program with exit status 1 instead of `abort()`.
+
+## Warnings
+
+A warning does not stop compilation: the C is still written. Warnings use
+`W` codes, numbered like the errors.
+
+| Code | Name | Meaning |
+|---|---|---|
+| W0001 | deprecated-goto | `goto` or `label`. Both are deprecated and will be removed in a future version. Leave a loop with `break`, or an outer loop with `break name` / `continue name` (`while ... as name`). |
 
 ## Adding an error
 

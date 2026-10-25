@@ -1,11 +1,16 @@
 # Every semantic error is reported. Each undeclared name is reported once.
-# expect: E0201 at 9:7
-# expect: E0401 at 11:5
-# expect: E0301 at 12:1
-# expect: E0302 at 14:1
-# expect: E0303 at 15:1
-# expect: E0202 at 18:5
-# expect: E0201 at 20:15
+# expect: E0201 at 14:7
+# expect: E0401 at 16:5
+# expect: W0001 at 17:1
+# expect: E0301 at 17:1
+# expect: W0001 at 18:1
+# expect: W0001 at 19:1
+# expect: E0302 at 19:1
+# expect: W0001 at 20:1
+# expect: E0303 at 20:1
+# expect: W0001 at 22:5
+# expect: E0202 at 23:5
+# expect: E0201 at 25:15
 print total
 total = total + 1
 x = 99999999999999999999999999999999999999999

@@ -25,6 +25,7 @@ RESERVED_WORDS = frozenset(
      "break", "continue", "as", "true", "false", "and", "or", "not"}
 ) | types.TYPE_NAMES
 
+_GOTO_HELP = "leave a loop with 'break', or an outer loop with 'break name' / 'continue name' (while ... as name)"
 
 
 @dataclass
@@ -293,6 +294,7 @@ class SemanticAnalyzer:
             elif isinstance(stmt, Block):
                 self._visit_block(stmt, scope)
             elif isinstance(stmt, Label):
+                self._diagnostics.warning(codes.DEPRECATED_GOTO, stmt.location, keyword="label", help=_GOTO_HELP)
                 self._check_name(stmt.name, "label", stmt.location)
                 if stmt.name in self._model.labels:
                     # Keep the first definition; gotos are checked against it.
@@ -304,6 +306,7 @@ class SemanticAnalyzer:
                     self._model.labels[stmt.name] = scope
                     self._model.label_locations[stmt.name] = stmt.location
             elif isinstance(stmt, Goto):
+                self._diagnostics.warning(codes.DEPRECATED_GOTO, stmt.location, keyword="goto", help=_GOTO_HELP)
                 self._model.gotos.append(stmt)
                 self._goto_sites.append((stmt, scope))
 
