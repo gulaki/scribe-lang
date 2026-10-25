@@ -19,7 +19,8 @@ All generated names are deterministic and readable.
 | Scribe | C |
 |---|---|
 | variable `x` | `v_x` (Scribe has no shadowing, so never a suffix) — done |
-| label `top` | `l_top` — done |
+| label `top` | `l_top` — done (deprecated) |
+| `break`/`continue` of an outer loop `rows` | `goto break_rows_1;` / `goto continue_rows_1;`, numbered per loop name, emitted only when jumped to — done |
 | temporaries | `t_1`, `t_2`, ... — done (multiple assignment, comparison chains), numbered per program for now; per function later |
 | runtime helpers | `scribe_add_i64`, `scribe_trap`, `scribe_read_f64`, ... — done |
 | function `gcd(i64,i64)` | `f_gcd__i64_i64` |

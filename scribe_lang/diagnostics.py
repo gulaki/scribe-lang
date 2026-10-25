@@ -46,8 +46,8 @@ def _register(code: str, name: str, template: str, severity: Severity = Severity
 
 # Codes are grouped by hundreds and never reused or renumbered once released.
 #   E00xx  driver and internal   E01xx  syntax       E02xx  names and scopes
-#   E03xx  labels and goto       E04xx  literals     E05xx  types
-#   E06xx  assignments
+#   E03xx  control flow          E04xx  literals     E05xx  types
+#   E06xx  assignments           W00xx  warnings
 
 INTERNAL_ERROR = _register("E0001", "internal-error", "internal compiler error: {detail}")
 CANNOT_READ_SOURCE = _register("E0002", "cannot-read-source", "cannot read {path}: {reason}")
@@ -72,6 +72,9 @@ GOTO_INTO_BLOCK = _register(
     "E0303", "goto-into-block",
     "goto '{name}' jumps into a nested block; a goto may only jump within its own block or out to an enclosing block",
 )
+OUTSIDE_LOOP = _register("E0304", "break-outside-loop", "'{keyword}' outside a loop")
+UNKNOWN_LOOP = _register("E0305", "unknown-loop", "no enclosing loop is named '{name}'")
+LOOP_NAME_IN_USE = _register("E0306", "loop-name-in-use", "loop name '{name}' is already used by an enclosing loop")
 
 NUMBER_TOO_LARGE = _register("E0401", "number-too-large", "number {value} does not fit in {type}")
 
@@ -101,6 +104,11 @@ ASSIGNMENT_COUNT_MISMATCH = _register(
 )
 DUPLICATE_TARGET = _register(
     "E0602", "duplicate-assignment-target", "'{name}' is assigned more than once in one statement",
+)
+
+DEPRECATED_GOTO = _register(
+    "W0001", "deprecated-goto", "'{keyword}' is deprecated and will be removed in a future version",
+    Severity.WARNING,
 )
 
 
@@ -173,8 +181,9 @@ class Diagnostics:
         self._items.append(diagnostic)
         return diagnostic
 
-    # Most call sites report errors; the name reads better there.
+    # The severity comes from the code; these names read better at call sites.
     error = report
+    warning = report
 
     def _span(self, where: SourceLocation | Span | None) -> Span:
         if isinstance(where, Span):

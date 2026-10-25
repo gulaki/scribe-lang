@@ -1,0 +1,13 @@
+# `break name` and `continue name` must name a loop around them.
+# expect: E0305 at 8:19
+i = 0
+while i < 3 as rows {
+    j = 0
+    while j < 3 {
+        if j == 1 {
+            break cols
+        }
+        j = j + 1
+    }
+    i = i + 1
+}

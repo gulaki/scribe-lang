@@ -18,7 +18,7 @@ Rule: a feature may not ship until every row it touches has a mechanism and a te
 | 12 | `printf`-style format string misuse | emit: strings print through `puts`, never as formats; numbers print through `printf` with a fixed format string | done |
 | 13 | Invalid/ill-formed program text: trigraphs, bad escapes, non-ASCII source charset | emit: ASCII-only literals with escapes | done |
 | 14 | Name clashes with keywords, libc, reserved identifiers (`__x`, `_X`) | emit: prefixed generated names | done |
-| 15 | Jump past a declaration / into a scope (`goto`, VLAs) | reject (goto into nested block); locals declared at block top | done |
+| 15 | Jump past a declaration / into a scope (`goto`, VLAs) | reject (goto into nested block); locals declared at block top. A named `break`/`continue` only jumps outwards, to a label after a loop or at the end of its body | done |
 | 16 | Reading a value whose lifetime ended (returning address of a local) | absent: borrows cannot be returned or stored | n/a |
 | 17 | Stack overflow from deep recursion | check: functions in a call-graph cycle count their depth; past the limit (1,000) the call fails with R0005 and a traceback (runtime-errors.md §6) | no functions |
 | 18 | Allocation failure (`malloc` returns NULL) | check: single allocation wrapper traps | no heap |

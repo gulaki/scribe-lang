@@ -25,6 +25,30 @@ numbers.
 
 ## Unreleased
 
+### Added
+
+- `break` and `continue`. `while cond as name {` names a loop, so `break
+  name` and `continue name` reach it from loops nested inside. Errors E0304
+  to E0306.
+- Warnings, starting with W0001; [`docs/errors.md`](docs/errors.md) lists
+  them.
+- The `f2c.scribe` example (Fahrenheit to Celsius, types inferred through an
+  expression) and `loop_break.scribe`, which replaces `loop_goto.scribe`.
+
+### Changed (breaking)
+
+- `break`, `continue` and `as` are reserved words.
+
+### Deprecated
+
+- `goto` and `label` give warning W0001 and will be removed in a future
+  version. `primes.scribe` and `newton_sqrt.scribe` now use `continue` and
+  `break`.
+
+## 0.5.2 - 2026-10-23
+
+Pull request #8.
+
 ### Fixed
 
 - Dividing a float by zero no longer depends on the C compiler. ISO C leaves

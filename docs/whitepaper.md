@@ -1,6 +1,6 @@
 # Scribe: a safe, readable front end for C
 
-*Design whitepaper, draft 4. The language today has the scalar types i64, f64, f32 and bool, declarations, chained and multiple assignment, `/` `//` `%` `**`, `and`/`or`/`not`, comparison chains, blocks, `if`/`while` and `goto`; [`language.md`](language.md) describes it. Everything else here is a design target.*
+*Design whitepaper, draft 4. The language today has the scalar types i64, f64, f32 and bool, declarations, chained and multiple assignment, `/` `//` `%` `**`, `and`/`or`/`not`, comparison chains, blocks, `if`/`while`, `break`/`continue` with named loops, and the deprecated `goto`; [`language.md`](language.md) describes it. Everything else here is a design target.*
 
 ## 1. Thesis
 
@@ -19,7 +19,7 @@ Each point is stated, then judged: what holds, where the risks are and what we r
 - Rejecting is not enough; **the runtime behaviour on violation must also be defined**. Policy: a violated check (overflow, division by zero, and later array bounds) *traps*: it prints a located message and stops the program (`abort()`, so a nonzero exit status). No silent wraparound, no exceptions in v1. This is how integer overflow, integer division by zero and out-of-range float-to-integer casts behave today.
 - Defence in depth: every program the test suite generates is built with `-std=c11 -pedantic-errors -Wall -Wextra`. The runtime-error tests always build with UBSan, so a check that fires too late shows up as a sanitizer report, and `SCRIBE_SANITIZE=1` builds every run with UBSan. AddressSanitizer joins once there is heap memory to check. The guarantee is only as good as the emitter and the hand-written runtime, so both are tested adversarially.
 - AI-friendliness is a design input: one obvious way to do each thing, locally checkable rules, diagnostics precise enough to feed back into a model.
-- `goto` exists today. It interacts with cleanup (jumping out of a scope must run destructors). Keep it function-local and lower it so cleanups run on every exit edge; revisit whether it survives past stage M5.
+- `goto` is deprecated (warning W0001) now that `break` and `continue`, with named loops for outer loops, cover its uses; it will be removed in a future version. Every structured exit (`break`, `continue`, later `return`) is lowered so cleanups run on every exit edge.
 
 ### 2.2 Explicit typing first, a little inference later
 **Agree, and implemented for scalars.** Inference is *local and one-directional*: a variable's type comes from its first assignment (a literal, a cast, later a constructor call or a function's return type) and never from later uses. No unification, no inference across statements. `x = 3` is an `i64`, `x = 3.0` an `f64`, `x = 2.5f` an `f32`; later, `a = Account(...)` will be an `Account`. Everything else is declared: `i64: x, y = 5`.
@@ -110,7 +110,7 @@ Order rationale: types before functions (signatures need them), arrays before st
 5. **C interop.** An `extern` mechanism is where pointers sneak back in. Proposal: a vetted, audited binding layer, not user-written.
 6. **Concurrency.** Out of scope until the ownership model is settled; data races are UB we simply do not offer yet.
 7. **Strings.** UTF-8 bytes with validated construction; indexing by byte or by code point?
-8. **`goto`.** Keep, restrict or remove once structured control flow (`break`, `continue`, `return`) exists?
+8. **`goto`.** Decided: deprecated, with warning W0001, now that `break` and `continue` exist (`while cond as name` names a loop that an inner `break name` or `continue name` can reach). It will be removed in a later breaking version. Multi-level exits use names rather than counts (`break 2`), so moving code in or out of a loop can never silently change the target.
 
 ## 6. Non-goals
 

@@ -196,10 +196,11 @@ def test_reserved_words_match_the_keywords_in_the_grammar():
 # -- collecting every error ---------------------------------------------------
 
 def analyze(source):
-    """(code, line, column) for every diagnostic, in the order reported."""
+    """(code, line, column) for every error, in the order reported. Warnings,
+    such as W0001 for `goto` and `label`, are tested in test_loops.py."""
     diags = Diagnostics("t.scribe")
     SemanticAnalyzer().analyze(Parser().parse(source), diags)
-    return [(x.code.code, x.span.line, x.span.column) for x in diags]
+    return [(x.code.code, x.span.line, x.span.column) for x in diags.errors]
 
 
 def test_every_semantic_error_is_reported_not_just_the_first():
@@ -233,7 +234,7 @@ def test_a_duplicate_label_does_not_hide_later_checks():
 def notes(source):
     diags = Diagnostics("t.scribe")
     SemanticAnalyzer().analyze(Parser().parse(source), diags)
-    (diag,) = diags
+    (diag,) = diags.errors
     return [(n.message, n.span.line, n.span.column) for n in diag.notes]
 
 

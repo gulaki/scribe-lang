@@ -54,6 +54,9 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0301 | undeclared-label | `goto` names a label that does not exist. |
 | E0302 | duplicate-label | Two labels have the same name. A note points at the first one, which stays in effect. |
 | E0303 | goto-into-block | `goto` may only jump within its own block or out to an enclosing one. A note points at the label. |
+| E0304 | break-outside-loop | `break` or `continue` outside any loop. |
+| E0305 | unknown-loop | `break name` or `continue name`, where no loop around it is named `name`. Name the loop to leave with `while cond as name {`; the help lists the names in scope. |
+| E0306 | loop-name-in-use | A nested loop reuses the name of a loop around it, so `break name` would be ambiguous. A note points at the outer loop. Loops side by side may share a name. |
 | E0401 | number-too-large | A literal does not fit the type it gets: an integer beyond i64, a float that rounds to infinity (above about 1.8e308 for f64, 3.4e38 for f32), or an integer that is not exact in the float type it meets (`f + 16777217` with `f` an f32). |
 | E0501 | type-mismatch | An assignment whose value does not convert losslessly to the variable's type, which was fixed by its first assignment. A note points at that assignment. Convert explicitly, e.g. `f64(n)`. |
 | E0502 | no-common-type | An operator or comparison mixes types that no type holds exactly, such as i64 and f64. Convert one side with a cast. |
@@ -71,7 +74,7 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0602 | duplicate-assignment-target | A chained or multiple assignment names the same variable twice, such as `a = b = a = 0` or `a, a = 1, 2`. A note points at the first one. |
 
 Codes are grouped by hundreds: `E00xx` driver and internal, `E01xx` syntax,
-`E02xx` names and scopes, `E03xx` labels and `goto`, `E04xx` literals,
+`E02xx` names and scopes, `E03xx` control flow (loops, labels and `goto`), `E04xx` literals,
 `E05xx` types, `E06xx` assignments.
 
 ## Runtime errors
@@ -92,11 +95,18 @@ prog.scribe:4:11: runtime error: integer overflow
 | `negative exponent` | An i64 `**` whose exponent is negative: the result would not be an integer. Raise a float instead: `2.0 ** -1`. |
 | `value out of range for i64` | `i64(x)` where `x` is NaN, infinite, or outside the range of i64. |
 
-Warnings, when there are some, will use `W` codes.
-
 *Planned* ([runtime-errors.md](design/runtime-errors.md)): runtime errors get
 codes (`R0001` integer overflow, ...), propagate through function calls with
 a traceback, and end the program with exit status 1 instead of `abort()`.
+
+## Warnings
+
+A warning does not stop compilation: the C is still written. Warnings use
+`W` codes, numbered like the errors.
+
+| Code | Name | Meaning |
+|---|---|---|
+| W0001 | deprecated-goto | `goto` or `label`. Both are deprecated and will be removed in a future version. Leave a loop with `break`, or an outer loop with `break name` / `continue name` (`while ... as name`). |
 
 ## Adding an error
 
