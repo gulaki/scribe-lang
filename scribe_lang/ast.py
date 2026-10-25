@@ -119,9 +119,33 @@ class If(Stmt):
 
 @dataclass(frozen=True)
 class While(Stmt):
+    """`while cond { ... }`, or `while cond as name { ... }` for a loop that
+    `break name` and `continue name` can refer to."""
+
     condition: Expr
     body: Block
     location: SourceLocation = field(default_factory=SourceLocation)
+    name: str | None = None
+    name_location: SourceLocation = field(default_factory=SourceLocation, compare=False)
+
+
+@dataclass(frozen=True)
+class Break(Stmt):
+    """`break` leaves the innermost loop; `break name` the loop called `name`."""
+
+    name: str | None = None
+    location: SourceLocation = field(default_factory=SourceLocation)
+    name_location: SourceLocation = field(default_factory=SourceLocation, compare=False)
+
+
+@dataclass(frozen=True)
+class Continue(Stmt):
+    """`continue` goes on to the next pass of the innermost loop, or of the
+    loop called `name`."""
+
+    name: str | None = None
+    location: SourceLocation = field(default_factory=SourceLocation)
+    name_location: SourceLocation = field(default_factory=SourceLocation, compare=False)
 
 
 @dataclass(frozen=True)
@@ -238,4 +262,4 @@ class Cast(Expr):
     location: SourceLocation = field(default_factory=SourceLocation)
 
 
-StmtType = Union[Print, Input, Let, ChainedLet, MultiLet, Declaration, If, While, Block, Label, Goto]
+StmtType = Union[Print, Input, Let, ChainedLet, MultiLet, Declaration, If, While, Break, Continue, Block, Label, Goto]

@@ -4,10 +4,10 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from .ast import (
-    Binary, Block, BoolLit, Cast, ChainedLet, Comparison, ComparisonChain,
-    Declaration, Expr, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let,
-    Logical, MultiLet, Not, Print, Program, SourceLocation, Stmt, Unary,
-    Variable, While,
+    Binary, Block, BoolLit, Break, Cast, ChainedLet, Comparison, ComparisonChain,
+    Continue, Declaration, Expr, FloatLit, Goto, Grouped, If, Input, IntLit,
+    Label, Let, Logical, MultiLet, Not, Print, Program, SourceLocation, Stmt,
+    Unary, Variable, While,
 )
 from . import diagnostics as codes
 from . import types
@@ -22,8 +22,9 @@ from .types import ScalarType
 # the keyword terminals in the grammar file so the two cannot drift apart.
 RESERVED_WORDS = frozenset(
     {"print", "input", "if", "elif", "else", "while", "label", "goto",
-     "true", "false", "and", "or", "not"}
+     "break", "continue", "as", "true", "false", "and", "or", "not"}
 ) | types.TYPE_NAMES
+
 
 
 @dataclass
@@ -229,6 +230,8 @@ class SemanticAnalyzer:
         self._reported_undeclared: set[str] = set()
         # Exact values of integer constant expressions, before they are typed.
         self._consts: dict[int, int] = {}
+        # The loops around the statement being checked, innermost last.
+        self._loops: list[While] = []
 
         self._visit_statements(program.statements, model.root)
 
@@ -280,7 +283,13 @@ class SemanticAnalyzer:
                     self._visit_block(stmt.orelse, scope)
             elif isinstance(stmt, While):
                 self._truth(stmt.condition, scope, "a condition")
+                if stmt.name is not None:
+                    self._check_loop_name(stmt)
+                self._loops.append(stmt)
                 self._visit_block(stmt.body, scope)
+                self._loops.pop()
+            elif isinstance(stmt, (Break, Continue)):
+                self._loop_jump(stmt)
             elif isinstance(stmt, Block):
                 self._visit_block(stmt, scope)
             elif isinstance(stmt, Label):
@@ -297,6 +306,29 @@ class SemanticAnalyzer:
             elif isinstance(stmt, Goto):
                 self._model.gotos.append(stmt)
                 self._goto_sites.append((stmt, scope))
+
+    def _check_loop_name(self, loop: While) -> None:
+        self._check_name(loop.name, "loop", loop.name_location)
+        enclosing = next((outer for outer in self._loops if outer.name == loop.name), None)
+        if enclosing is not None:
+            self._diagnostics.error(
+                codes.LOOP_NAME_IN_USE, loop.name_location, name=loop.name,
+                notes=((f"the enclosing loop '{loop.name}' is here", enclosing.name_location),),
+                help="give the inner loop another name",
+            )
+
+    def _loop_jump(self, stmt: Break | Continue) -> None:
+        """`break` / `continue` must be inside a loop, and a name must be the
+        name of a loop around it."""
+        keyword = "break" if isinstance(stmt, Break) else "continue"
+        if not self._loops:
+            self._diagnostics.error(codes.OUTSIDE_LOOP, stmt.location, keyword=keyword)
+            return
+        if stmt.name is not None and all(loop.name != stmt.name for loop in self._loops):
+            names = [loop.name for loop in reversed(self._loops) if loop.name is not None]
+            help = (f"the loops around it are named {', '.join(repr(n) for n in names)}" if names
+                    else f"name the loop to leave: while ... as {stmt.name} {{")
+            self._diagnostics.error(codes.UNKNOWN_LOOP, stmt.name_location, name=stmt.name, help=help)
 
     def _visit_block(self, block: Block, parent: Scope) -> None:
         scope = Scope(parent)

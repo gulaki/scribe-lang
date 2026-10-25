@@ -4,10 +4,10 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 from .ast import (
-    Binary, Block, BoolLit, Cast, ChainedLet, Comparison, ComparisonChain,
-    Declaration, Expr, FloatLit, Goto, Grouped, If, Input, IntLit, Label, Let,
-    Logical, MultiLet, Not, Print, Program, SourceLocation, Unary, Variable,
-    While,
+    Binary, Block, BoolLit, Break, Cast, ChainedLet, Comparison, ComparisonChain,
+    Continue, Declaration, Expr, FloatLit, Goto, Grouped, If, Input, IntLit,
+    Label, Let, Logical, MultiLet, Not, Print, Program, SourceLocation, Unary,
+    Variable, While,
 )
 from . import types
 from .semantics import Scope, SemanticModel
@@ -392,6 +392,22 @@ def _without_outer_parentheses(text: str) -> str:
     return text[1:-1]
 
 
+@dataclass
+class _Loop:
+    """A `while` being emitted. A `break`/`continue` aimed at it from a nested
+    loop becomes a `goto` to one of its labels, `break_<name>_<n>` or
+    `continue_<name>_<n>`; `n` keeps sibling loops with one name apart, since
+    C labels belong to the whole function."""
+
+    name: str | None
+    number: int
+    broken: bool = False
+    continued: bool = False
+
+    def label(self, keyword: str) -> str:
+        return f"{keyword}_{self.name}_{self.number}"
+
+
 _CHECKED_I64 = {
     "+": "scribe_add_i64", "-": "scribe_sub_i64", "*": "scribe_mul_i64",
     "//": "scribe_floordiv_i64", "%": "scribe_mod_i64", "**": "scribe_pow_i64",
@@ -435,6 +451,10 @@ class CEmitter:
     _temporaries: int = field(default=0, init=False)
     # Declarations of the expression temporaries each open C block needs.
     _block_temporaries: list[list[str]] = field(default_factory=list, init=False)
+    # The loops around the statement being emitted, innermost last.
+    _loops: list[_Loop] = field(default_factory=list, init=False)
+    # How many loops of each name have been emitted, to number their labels.
+    _loop_names: dict[str | None, int] = field(default_factory=dict, init=False)
 
     def emit_program(self, program: Program, model: SemanticModel) -> str:
         self._body = []
@@ -446,6 +466,8 @@ class CEmitter:
         self._helpers = set()
         self._sites = []
         self._temporaries = 0
+        self._loops = []
+        self._loop_names = {}
 
         globals_ = [f"{self._c_type(symbol.type)} {c_variable(name)};" for name, symbol in sorted(model.root.symbols.items())]
 
@@ -591,9 +613,34 @@ class CEmitter:
                 self._block_body(stmt.orelse)
             self._line("}")
         elif isinstance(stmt, While):
+            self._loop_names[stmt.name] = self._loop_names.get(stmt.name, 0) + 1
+            loop = _Loop(stmt.name, self._loop_names[stmt.name])
+            self._loops.append(loop)
             self._line(f"while ({self._condition(stmt.condition)}) {{")
             self._block_body(stmt.body)
+            self._loops.pop()
+            # The labels of a named loop, only if a nested loop jumps to them
+            # (an unused label is a -Wall warning). `continue` lands at the end
+            # of the body, so the condition is tested again.
+            if loop.continued:
+                self._body.append(f"{loop.label('continue')}:;")
             self._line("}")
+            if loop.broken:
+                self._body.append(f"{loop.label('break')}:;")
+        elif isinstance(stmt, (Break, Continue)):
+            keyword = "break" if isinstance(stmt, Break) else "continue"
+            target = self._loops[-1]
+            if stmt.name is not None:
+                target = next(loop for loop in reversed(self._loops) if loop.name == stmt.name)
+            if target is self._loops[-1]:
+                self._line(f"{keyword};")
+            else:
+                # C's break and continue only reach the innermost loop.
+                if keyword == "break":
+                    target.broken = True
+                else:
+                    target.continued = True
+                self._line(f"goto {target.label(keyword)};")
         elif isinstance(stmt, Block):
             self._line("{")
             self._block_body(stmt)

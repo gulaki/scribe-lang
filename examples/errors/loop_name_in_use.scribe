@@ -1,0 +1,10 @@
+# A nested loop cannot reuse the name of a loop around it: `break rows`
+# would be ambiguous. Sibling loops may share a name.
+# expect: E0306 at 6:20
+i = 0
+while i < 3 as rows {
+    while i < 2 as rows {
+        i = i + 1
+    }
+    i = i + 1
+}

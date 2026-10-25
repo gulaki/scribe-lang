@@ -20,6 +20,8 @@ _sep: (_NL | ";")+
           | decl_stmt
           | if_stmt
           | while_stmt
+          | break_stmt
+          | continue_stmt
           | block
           | label_stmt
           | goto_stmt
@@ -40,12 +42,17 @@ declarator: IDENT ("=" expression)?
 // `}` and the next `elif` / `else` must be on the same line (K&R style).
 // A condition is any expression; semantics requires a bool or an integer.
 if_stmt: IF expression block (ELIF expression block)* (ELSE block)?
-while_stmt: WHILE expression block
+// `while cond as rows {` names the loop, so `break rows` and `continue rows`
+// can leave or continue it from a loop nested inside.
+while_stmt: WHILE expression (AS IDENT)? block
+break_stmt: BREAK IDENT?
+continue_stmt: CONTINUE IDENT?
 
 // A block is a scope. LBRACE/RBRACE are named so their positions survive into
 // the parse tree and can be attached to AST nodes.
 block: LBRACE _sep? _stmt_list? RBRACE
 
+// Deprecated (warning W0001): use break and continue.
 label_stmt: LABEL IDENT
 goto_stmt: GOTO IDENT
 
@@ -101,6 +108,9 @@ ELSE: "else"
 WHILE: "while"
 LABEL: "label"
 GOTO: "goto"
+BREAK: "break"
+CONTINUE: "continue"
+AS: "as"
 TRUE: "true"
 FALSE: "false"
 AND: "and"

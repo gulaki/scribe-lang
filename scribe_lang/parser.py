@@ -8,10 +8,10 @@ from lark import Lark, Transformer, Token
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 from .ast import (
-    Binary, Block, BoolLit, Cast, ChainedLet, Comparison, ComparisonChain,
-    Declaration, Declarator, Elif, FloatLit, Goto, Grouped, If, Input, IntLit,
-    Label, Let, Logical, MultiLet, Not, Print, Program, SourceLocation, Stmt,
-    Unary, Variable, While,
+    Binary, Block, BoolLit, Break, Cast, ChainedLet, Comparison, ComparisonChain,
+    Continue, Declaration, Declarator, Elif, FloatLit, Goto, Grouped, If, Input,
+    IntLit, Label, Let, Logical, MultiLet, Not, Print, Program, SourceLocation,
+    Stmt, Unary, Variable, While,
 )
 from . import diagnostics as codes
 from .diagnostics import Diagnostics, Span
@@ -107,8 +107,17 @@ class ASTBuilder(Transformer):
         return If(condition, body, tuple(elifs), orelse, _loc(if_token))
 
     def while_stmt(self, items):
-        # WHILE, comparison, Block
+        # WHILE, condition, (AS, name)?, Block
+        if len(items) == 5:
+            name = items[3]
+            return While(items[1], items[4], _loc(items[0]), str(name), _loc(name))
         return While(items[1], items[2], _loc(items[0]))
+
+    def break_stmt(self, items):
+        return _loop_jump(Break, items)
+
+    def continue_stmt(self, items):
+        return _loop_jump(Continue, items)
 
     def label_stmt(self, items):
         return Label(str(items[1]), _loc(items[0]))
@@ -200,6 +209,13 @@ def _fold_binary(items):
         rhs = items[i + 1]
         node = Binary(node, str(op), rhs, getattr(node, "location", SourceLocation()), _loc(op))
     return node
+
+
+def _loop_jump(node, items):
+    """`break` / `continue`, with an optional loop name."""
+    if len(items) == 2:
+        return node(str(items[1]), _loc(items[0]), _loc(items[1]))
+    return node(None, _loc(items[0]))
 
 
 def _fold_logical(items):
@@ -361,13 +377,17 @@ _TERMINAL_WORDS = {
 }
 _KEYWORDS = {
     "PRINT", "INPUT", "IF", "ELIF", "ELSE", "WHILE", "LABEL", "GOTO",
+    "BREAK", "CONTINUE", "AS",
     "I64", "F32", "F64", "BOOL", "TRUE", "FALSE", "AND", "OR", "NOT",
 }
 
 # When every terminal of a group is expected, say the group's name instead.
 _GROUPS = [
     ("an operator", {"ADD_OP", "MUL_OP", "POW_OP", "COMP_OP", "AND", "OR"}),
-    ("a statement", {"PRINT", "INPUT", "IF", "WHILE", "LABEL", "GOTO", "IDENT", "LBRACE", "I64", "F32", "F64", "BOOL"}),
+    ("a statement", {
+        "PRINT", "INPUT", "IF", "WHILE", "BREAK", "CONTINUE", "LABEL", "GOTO", "IDENT", "LBRACE",
+        "I64", "F32", "F64", "BOOL",
+    }),
     ("an expression", {
         "INT_LIT", "FLOAT_LIT", "IDENT", "LPAR", "SIGN", "I64", "F32", "F64", "BOOL", "TRUE", "FALSE", "NOT",
     }),

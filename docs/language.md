@@ -621,7 +621,8 @@ Compile-time errors are listed in [errors.md](errors.md).
 ## Reserved words
 
 These cannot be used as names: `print`, `input`, `if`, `elif`, `else`,
-`while`, `label`, `goto`, `true`, `false`, `and`, `or`, `not`, and the type
+`while`, `break`, `continue`, `as`, `label`, `goto`, `true`, `false`, `and`,
+`or`, `not`, and the type
 names `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f16`, `f32`,
 `f64`, `f128`, `bool`, `char`, `byte` and `str`. Only `i64`, `f64`, `f32` and
 `bool` are usable types so far; the others are reserved for later.
