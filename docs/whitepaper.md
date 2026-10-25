@@ -88,7 +88,7 @@ Today the pipeline is `parse -> AST -> semantics (scopes and types) -> C text`. 
 | Stage | Adds | Safety work |
 |---|---|---|
 | M1 (done) | float-only, blocks, `goto`, strings in `print` | float literals, `puts`, name prefixes |
-| M2 (in progress) | done: `i64`, `f64`, `f32`, `bool`, Python-style literals, declarations, chained and multiple assignment, casts, `/` `//` `%` `**`, `and`/`or`/`not`, conditions as expressions, comparison chains, headers and libraries only when used. Next: sized integers, float `//` and `%`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
+| M2 (in progress) | done: `i64`, `f64`, `f32`, `bool`, Python-style literals, declarations, chained and multiple assignment, casts, `/` `//` `%` `**`, `and`/`or`/`not`, conditions as expressions, comparison chains, `break`/`continue` with named loops (`goto` deprecated), headers and libraries only when used. Next: sized integers, float `//` and `%`; see [status and next steps](design/type-system.md#status-and-next-steps) | done: checked arithmetic, trap runtime, UBSan tests. Next: range analysis to remove provably safe checks |
 | M3 | typed IR, runtime errors that propagate with tracebacks, functions, `return`, recursion, overloading, `use math`; see [functions.md](design/functions.md#10-roadmap) | strict evaluation order, exit analysis, recursion limit, ambiguity errors |
 | M4 | arrays, strings, `for`, runtime templates | bounds checks, allocation-failure policy |
 | M5 | `struct`, value semantics, borrow rules | exclusive access, move checking |

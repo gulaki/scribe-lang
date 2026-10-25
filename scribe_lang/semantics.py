@@ -185,8 +185,12 @@ class SemanticAnalyzer:
     * `if` / `elif` / `while` conditions belong to the enclosing scope; each
       body (and `else`) is its own scope.
     * Variables are not visible after the block that declared them ends.
+    * `break` and `continue` must be inside a loop. `break name` and
+      `continue name` must name a loop around them (`while cond as name`),
+      and a nested loop cannot reuse the name of a loop around it.
     * Labels live in one program-wide namespace, but `goto` may only jump to a
       label in its own block or an enclosing block, never into a nested one.
+      Both are deprecated: each `label` and `goto` gives warning W0001.
 
     Typing rules (docs/design/type-system.md)
     ------------------------------------------

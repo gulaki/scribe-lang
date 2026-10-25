@@ -139,8 +139,9 @@ out of it.
 | A statement after `return`, `break` or `continue` | warning W0002 unreachable-code |
 | The returned value converts to `T` by the assignment rule | E0501 |
 
-Every exit edge (`return`, the end of the body, a runtime error, and later
-`break`/`continue` and `finally`) runs the cleanups of the scopes it leaves.
+Every exit edge (`return`, the end of the body, a runtime error,
+`break`/`continue`, and later `finally`) runs the cleanups of the scopes it
+leaves.
 Today no scalar needs a cleanup, but the lowering already uses a single
 error exit per function, so the cleanup ladder of memory-model.md §3 has
 somewhere to go.
