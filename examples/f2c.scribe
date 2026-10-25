@@ -1,0 +1,5 @@
+f32: F
+print "Enter temp in fahrenheit:"
+input F
+C = (F - 32) / 9 * 5
+print C

@@ -166,6 +166,7 @@ EXAMPLE_RUNS = {
     "booleans": ("540\n", "Enter a number of minutes:\ntrue\ntrue\nno average, or a long one\ntrue\n2\n"),
     "types": ("", "2\n1\n7.50\n14\n7\n26\n3\n3.50\n1024\n1.41\n"),
     "sum_avg": ("3\n1\n2\n6\n", "How many numbers?\n" + "\nEnter number:\n" * 3 + "Sum =\n9.00\nAverage =\n3.00\n"),
+    "f2c": ("212\n", "Enter temp in fahrenheit:\n100.00\n"),
 }
 
 
