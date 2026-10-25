@@ -1,0 +1,13 @@
+# Count up to N with a loop that only ends through `break`.
+# (This replaces the old `goto` version: `goto` and `label` are deprecated.)
+i = 1
+print "Enter number: "
+i64: N
+input N
+while true {
+    if i > N {
+        break
+    }
+    print i
+    i = i + 1
+}

@@ -15,8 +15,9 @@ specified in [functions.md](functions.md).
 | Compile error | semantic analysis | `E02xx` ... `E06xx` (later `E07xx` for functions) | an undeclared name, a type mismatch, `2 ** -1` |
 | Runtime error | the running program | `R0xxx` (new) | integer overflow, division by zero, a negative exponent |
 
-Warnings (`W0xxx`) are not errors. The first will be unreachable code
-(functions.md, "Exit analysis").
+Warnings (`W0xxx`) are not errors. The first, W0001, marks the deprecated
+`goto` and `label`; unreachable code will be W0002 (functions.md, "Exit
+analysis").
 
 Runtime errors get stable codes like compile errors, so tests, scripts and
 AI agents can rely on them.

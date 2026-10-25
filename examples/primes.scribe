@@ -1,19 +1,19 @@
 # Primes up to a limit, by trial division.
-# Showcases: nested loops, `%`, and `goto` as a "break/continue".
+# Showcases: nested loops, `%`, and a named loop: `continue candidates`
+# goes on to the next n straight from the inner loop.
 print "Print primes up to:"
 i64: limit             # declared i64, so `input` reads a whole number
 input limit
 
-n = 2
-while n <= limit {
+n = 1
+while n < limit as candidates {
+    n = n + 1
     d = 2
     while d * d <= n {
         if n % d == 0 {
-            goto composite     # leaves both loops at once
+            continue candidates    # n has a divisor: try the next n
         }
         d = d + 1
     }
-    print n                    # reached only when no divisor was found
-    label composite
-    n = n + 1
+    print n                        # reached only when no divisor was found
 }

@@ -156,7 +156,7 @@ a = 1
 EXAMPLE_RUNS = {
     "factorial": ("5\n", "Enter number to calculate factorial:\n\nFactorial = \n120\n"),
     "fibonacci": ("6\n", "How many fibonacci numbers do you want?\n\n0\n1\n1\n2\n3\n5\n"),
-    "loop_goto": ("3\n", "Enter number: \n1\n2\n3\n"),
+    "loop_break": ("3\n", "Enter number: \n1\n2\n3\n"),
     "classify": ("85\n", "Enter a score from 0 to 100:\ngrade B\n"),
     "gcd": ("48\n18\n", "Enter two positive whole numbers:\ngcd =\n6\n"),
     "scopes": ("", "10\n2\n0\n1\n4\n"),

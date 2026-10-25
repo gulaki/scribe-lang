@@ -50,7 +50,9 @@ greet()
 - Functions and variables share one namespace per file, as in Python. A
   variable may not have the name of a function, or the reverse (E07xx), in
   keeping with Scribe's no-shadowing rule.
-- Labels are local to a function. A `goto` can't leave or enter a function.
+- Labels are local to a function, and `break`/`continue` can't leave a
+  function. `goto` is deprecated (W0001) and will be removed, ideally before
+  functions arrive.
 
 ### 2.1 `global`
 
@@ -134,7 +136,7 @@ out of it.
 | A function with `-> T` must `return` a value on every path. `while true { }` without a way out counts as never reaching the end. | E07xx missing-return |
 | `return` without a value in a function with `-> T`, or `return value` in a function without one | E07xx |
 | `return` outside a function | E07xx |
-| A statement after `return`, or after a `goto` that always jumps | warning W0001 unreachable-code |
+| A statement after `return`, `break` or `continue` | warning W0002 unreachable-code |
 | The returned value converts to `T` by the assignment rule | E0501 |
 
 Every exit edge (`return`, the end of the body, a runtime error, and later
@@ -283,7 +285,7 @@ Each step is a task with failing tests first, as before.
 |---|---|---|
 | F1 | Typed IR: expressions with checked operations lowered to one operation per statement | none; strict left-to-right order (UB row 9) |
 | F2 | Runtime errors propagate to `main`: status-returning helpers, the error record, R codes, text and JSON reports, exit status 1 | runtime errors get codes, and the exit status changes from abort to 1 |
-| F3 | `fn`, parameters by value, `return`, calls, `global`, prototypes, exit analysis (missing return, W0001), the shared namespace rule | functions |
+| F3 | `fn`, parameters by value, `return`, calls, `global`, prototypes, exit analysis (missing return, W0002), the shared namespace rule | functions |
 | F4 | Tracebacks across calls, recursion limit R0005 | tracebacks |
 | F5 | Overloading | several functions with one name |
 | F6 | `use math` and the first audited `extern` bindings | `math.sqrt`, `math.floor`, ... |

@@ -580,6 +580,72 @@ if score >= 90 {
 B
 ```
 
+### Leaving a loop: `break` and `continue`
+
+`break` leaves the innermost loop. `continue` skips the rest of its body and
+goes on to the next pass, so the condition is tested again.
+
+```scribe
+i = 0
+while true {
+    i = i + 1
+    if i % 2 == 0 {
+        continue        # skip even numbers
+    }
+    if i > 7 {
+        break
+    }
+    print i
+}
+```
+
+```output
+1
+3
+5
+7
+```
+
+To leave or continue an *outer* loop, name it with `as`: `while cond as
+name {`. Then `break name` or `continue name` works from any loop nested
+inside it.
+
+```scribe
+# The first pair a < b with a * b == 12.
+a = 1
+while a <= 12 as pairs {
+    b = a + 1
+    while b <= 12 {
+        if a * b == 12 {
+            print a
+            print b
+            break pairs
+        }
+        b = b + 1
+    }
+    a = a + 1
+}
+```
+
+```output
+1
+12
+```
+
+A name refers only to a loop around the `break` or `continue`, so removing
+or adding a loop can never silently change which one it leaves: a name that
+no longer fits is an error. A nested loop can't reuse the name of a loop
+around it, but loops side by side may share a name.
+
+```scribe-error
+# expect: E0304 at 3:1
+# expect: E0305 at 5:11
+break
+while true {
+    break rows
+}
+```
+
 ### Deprecated: `goto` and `label`
 
 `label name` marks a place and `goto name` jumps to it. Both still work, but
@@ -645,6 +711,9 @@ Each Scribe variable `x` becomes the C variable `v_x`, and each label `top`
 becomes `l_top`, so no Scribe name can clash with C. Program-level variables
 are zero-initialised globals. A variable from a block is declared, set to
 zero, at the top of that C block, so a `goto` can never skip its declaration.
+`break` and `continue` of the innermost loop are C's own; for an outer loop
+they become a `goto` to a label the compiler puts after that loop
+(`break_pairs_1`) or at the end of its body (`continue_pairs_1`).
 Integer arithmetic calls small checked helpers such as `scribe_add_i64`,
 emitted only when a program uses them. A `bool` is a `uint8_t` that is
 always 0 or 1, and `and`/`or` become C's `&&` and `||`. The C builds with
