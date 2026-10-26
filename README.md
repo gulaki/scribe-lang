@@ -106,7 +106,9 @@ python -m pytest                     # everything, including compiling the docs'
 SCRIBE_SANITIZE=1 python -m pytest   # also build every run with UBSan
 ```
 
-Tests that build C skip themselves when no C compiler is installed.
+Tests that build C skip themselves when no C compiler is installed. Where the
+compiler has no UBSan runtime (MinGW-w64 gcc on Windows), UBSan runs in trap
+mode: undefined behaviour still stops the program, but without a report.
 
 ## Architecture
 

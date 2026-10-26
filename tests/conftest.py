@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,25 @@ STRICT_FLAGS = ["-std=c11", "-pedantic-errors", "-Wall", "-Wextra"]
 # Any undefined behaviour the generated C reaches stops the program with a
 # sanitizer report (and a nonzero exit) instead of going unnoticed.
 UBSAN_FLAGS = ["-fsanitize=undefined", "-fno-sanitize-recover=all"]
+
+
+def _ubsan_runtime_links() -> bool:
+    """Whether the C compiler can link UBSan's runtime library. MinGW-w64 gcc
+    does not ship libubsan."""
+    with tempfile.TemporaryDirectory() as tmp:
+        c_file = Path(tmp) / "probe.c"
+        c_file.write_text("int main(void) { return 0; }\n", encoding="utf-8")
+        probe = subprocess.run(
+            [C_COMPILER, *UBSAN_FLAGS, "-o", str(Path(tmp) / "probe.exe"), str(c_file)],
+            capture_output=True,
+        )
+        return probe.returncode == 0
+
+
+# Without the runtime, a check that fires executes a trap instruction instead:
+# the program still stops with a nonzero exit, but with no report on stderr.
+if C_COMPILER is not None and not _ubsan_runtime_links():
+    UBSAN_FLAGS.append("-fsanitize-trap=all")
 # SCRIBE_SANITIZE=1 builds every end-to-end program with UBSan as well.
 EXTRA_FLAGS = UBSAN_FLAGS if os.environ.get("SCRIBE_SANITIZE") == "1" else []
 
@@ -66,7 +86,10 @@ def build_scribe(compiler, tmp_path):
         assert build.returncode == 0, f"{build.stderr}\n--- generated C ---\n{result.c_source}"
 
         def run(stdin: str):
-            return subprocess.run([str(exe)], input=stdin, capture_output=True, text=True, timeout=10)
+            # The program writes UTF-8; the locale encoding (cp1252 on
+            # Windows) would misread non-ASCII text.
+            return subprocess.run([str(exe)], input=stdin, capture_output=True, text=True,
+                                  encoding="utf-8", timeout=10)
 
         return run
 
