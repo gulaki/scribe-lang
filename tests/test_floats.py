@@ -9,10 +9,12 @@ import subprocess
 
 import pytest
 
-from conftest import C_COMPILER, STRICT_FLAGS, UBSAN_FLAGS
+from conftest import C_COMPILER, STRICT_FLAGS, require_ubsan
 
-# UBSan's float-divide-by-zero check is not part of -fsanitize=undefined.
-FLOAT_DIVISION_CHECK = [*UBSAN_FLAGS, "-fsanitize=float-divide-by-zero"]
+
+def float_division_check() -> list[str]:
+    # UBSan's float-divide-by-zero check is not part of -fsanitize=undefined.
+    return [*require_ubsan(), "-fsanitize=float-divide-by-zero"]
 
 
 @pytest.mark.parametrize("source, output", [
@@ -28,7 +30,7 @@ FLOAT_DIVISION_CHECK = [*UBSAN_FLAGS, "-fsanitize=float-divide-by-zero"]
     ("x = 7.0\ny = 2.0\nprint x / y\n", "3.50\n"),
 ])
 def test_float_division_by_zero_is_defined(build_scribe, source, output):
-    proc = build_scribe(source, FLOAT_DIVISION_CHECK)("")
+    proc = build_scribe(source, float_division_check())("")
     assert (proc.returncode, proc.stdout) == (0, output), proc.stderr
 
 

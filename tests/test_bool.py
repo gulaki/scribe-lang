@@ -259,7 +259,7 @@ def test_truth_table_matches_a_python_reference(run_scribe):
 
 import random  # noqa: E402
 
-from conftest import UBSAN_FLAGS  # noqa: E402
+from conftest import require_ubsan  # noqa: E402
 
 
 def python_value(text, names):
@@ -332,7 +332,7 @@ def test_random_boolean_expressions_match_python(build_scribe):
             lines.append(f"print {scribe}")
             expected.append(python_value(python, names))
     # -Werror: the generated C must not draw a single warning; UBSan: no UB.
-    proc = build_scribe("\n".join(lines) + "\n", ["-Werror", *UBSAN_FLAGS])("")
+    proc = build_scribe("\n".join(lines) + "\n", ["-Werror", *require_ubsan()])("")
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.splitlines() == expected
 
@@ -343,7 +343,7 @@ def test_deep_nesting_compiles_cleanly_and_runs(build_scribe):
     for i in range(30):
         ands = f"(b or ({ands} and c))" if i % 2 else f"({ands} and not b)"
     source = f"a, b, c = 1, 0, 2\nprint {nots}\nprint {ands}\n"
-    proc = build_scribe(source, ["-Werror", *UBSAN_FLAGS])("")
+    proc = build_scribe(source, ["-Werror", *require_ubsan()])("")
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.splitlines() == [python_value(nots, dict(a=1)), python_value(ands, dict(a=1, b=0, c=2))]
 

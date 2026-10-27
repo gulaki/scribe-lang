@@ -190,7 +190,7 @@ def test_random_expressions_match_python(build_scribe):
     program and are tested above."""
     import random
 
-    from conftest import UBSAN_FLAGS
+    from conftest import require_ubsan
 
     rng = random.Random(20261023)
     values = [INT64_MIN, INT64_MIN + 1, -2**62, -10**9, -97, -8, -3, -2, -1,
@@ -217,7 +217,7 @@ def test_random_expressions_match_python(build_scribe):
         lines.append(f"a, b, c = {a}, {b}, {c}")
         lines.append(f"print (a {op1} b) {op2} c")
         expected.append(str(value))
-    proc = build_scribe("\n".join(lines) + "\n", [*UBSAN_FLAGS, "-Werror"])("")
+    proc = build_scribe("\n".join(lines) + "\n", [*require_ubsan(), "-Werror"])("")
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.split() == expected
 

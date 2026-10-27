@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import os
 import re
 import shutil
@@ -17,28 +18,67 @@ C_COMPILER = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
 STRICT_FLAGS = ["-std=c11", "-pedantic-errors", "-Wall", "-Wextra"]
 # Any undefined behaviour the generated C reaches stops the program with a
 # sanitizer report (and a nonzero exit) instead of going unnoticed.
-UBSAN_FLAGS = ["-fsanitize=undefined", "-fno-sanitize-recover=all"]
+UBSAN_RUNTIME = ("-fsanitize=undefined", "-fno-sanitize-recover=all")
+# Without UBSan's runtime library (MinGW-w64 gcc ships none, and some Linux
+# gcc installs lack libubsan), a check that fires executes a trap instruction
+# instead: the program still stops with a nonzero exit, but with no report.
+UBSAN_TRAP = (*UBSAN_RUNTIME, "-fsanitize-trap=all")
 
 
-def _ubsan_runtime_links() -> bool:
-    """Whether the C compiler can link UBSan's runtime library. MinGW-w64 gcc
-    does not ship libubsan."""
+def _links(flags: tuple[str, ...]) -> bool:
+    """Whether the C compiler can build and link a program with `flags`."""
     with tempfile.TemporaryDirectory() as tmp:
         c_file = Path(tmp) / "probe.c"
         c_file.write_text("int main(void) { return 0; }\n", encoding="utf-8")
-        probe = subprocess.run(
-            [C_COMPILER, *UBSAN_FLAGS, "-o", str(Path(tmp) / "probe.exe"), str(c_file)],
-            capture_output=True,
-        )
+        exe = Path(tmp) / ("probe.exe" if os.name == "nt" else "probe")
+        probe = subprocess.run([C_COMPILER, *flags, "-o", str(exe), str(c_file)], capture_output=True)
         return probe.returncode == 0
 
 
-# Without the runtime, a check that fires executes a trap instruction instead:
-# the program still stops with a nonzero exit, but with no report on stderr.
-if C_COMPILER is not None and not _ubsan_runtime_links():
-    UBSAN_FLAGS.append("-fsanitize-trap=all")
-# SCRIBE_SANITIZE=1 builds every end-to-end program with UBSan as well.
-EXTRA_FLAGS = UBSAN_FLAGS if os.environ.get("SCRIBE_SANITIZE") == "1" else []
+@functools.cache
+def ubsan_flags() -> tuple[str, ...] | None:
+    """The UBSan flags this C compiler can link: with the runtime if it can,
+    else in trap mode, else None. Probed once, the first time a test builds
+    with UBSan, so a run that builds nothing pays nothing."""
+    if C_COMPILER is None:
+        return None
+    for flags in (UBSAN_RUNTIME, UBSAN_TRAP):
+        if _links(flags):
+            return flags
+    return None
+
+
+def require_ubsan() -> list[str]:
+    """The UBSan flags, or skip the test when the compiler cannot build with
+    UBSan at all."""
+    flags = ubsan_flags()
+    if flags is None:
+        pytest.skip("the C compiler cannot build with UBSan, not even in trap mode")
+    return list(flags)
+
+
+def extra_flags() -> list[str]:
+    """SCRIBE_SANITIZE=1 builds every end-to-end program with UBSan as well.
+    Asking for it when UBSan cannot be built stops the run."""
+    if os.environ.get("SCRIBE_SANITIZE") != "1":
+        return []
+    flags = ubsan_flags()
+    if flags is None:
+        pytest.exit("SCRIBE_SANITIZE=1, but the C compiler cannot build with UBSan", returncode=4)
+    return list(flags)
+
+
+def pytest_terminal_summary(terminalreporter):
+    """Say so when the UBSan builds were not the full sanitizer."""
+    if ubsan_flags.cache_info().currsize == 0:
+        return  # nothing was built with UBSan
+    flags = ubsan_flags()
+    if flags is None:
+        terminalreporter.write_line("UBSan: not available with this C compiler; the tests that need it were skipped")
+    elif flags == UBSAN_TRAP:
+        terminalreporter.write_line(
+            "UBSan: trap mode (no runtime library): undefined behaviour still stops a program, but without a report"
+        )
 
 
 EXPECT = re.compile(r"# expect: (?P<code>[EW]\d{4}) at (?P<line>\d+):(?P<column>\d+)$")
@@ -101,7 +141,7 @@ def run_scribe(build_scribe):
     """Build and run Scribe source; returns its stdout. It must exit with 0."""
 
     def run(source: str, stdin: str = "") -> str:
-        proc = build_scribe(source, EXTRA_FLAGS)(stdin)
+        proc = build_scribe(source, extra_flags())(stdin)
         assert proc.returncode == 0, proc.stderr
         return proc.stdout
 
@@ -118,7 +158,7 @@ def run_trapping(build_scribe):
     """
 
     def run(source: str, stdin: str = "") -> str:
-        proc = build_scribe(source, UBSAN_FLAGS)(stdin)
+        proc = build_scribe(source, require_ubsan())(stdin)
         assert proc.returncode != 0, proc.stdout
         return proc.stderr
 
@@ -131,7 +171,7 @@ def run_trapping_or_output(build_scribe):
     that a program finishes without reaching a runtime error it guards."""
 
     def run(source: str, stdin: str = "") -> tuple[int, str]:
-        proc = build_scribe(source, UBSAN_FLAGS)(stdin)
+        proc = build_scribe(source, require_ubsan())(stdin)
         return proc.returncode, proc.stdout
 
     return run
