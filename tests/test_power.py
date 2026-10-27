@@ -230,13 +230,13 @@ def _random_power_cases(seed, count):
 
 
 def test_random_integer_powers_match_python(build_scribe):
-    from conftest import UBSAN_FLAGS
+    from conftest import require_ubsan
 
     fits = [(b, e, v) for b, e, v in _random_power_cases(20261023, 400) if INT64_MIN <= v <= INT64_MAX][:250]
     lines = ["i64: b, e"]
     for b, e, _ in fits:
         lines += [f"b, e = {b}, {e}", "print b ** e"]
-    proc = build_scribe("\n".join(lines) + "\n", [*UBSAN_FLAGS, "-Werror"])("")
+    proc = build_scribe("\n".join(lines) + "\n", [*require_ubsan(), "-Werror"])("")
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.split() == [str(v) for _, _, v in fits]
 
