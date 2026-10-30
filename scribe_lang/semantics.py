@@ -208,8 +208,8 @@ class SemanticAnalyzer:
     * `**` works in the common type of its operands, like `+`. An integer
       power needs an exponent of 0 or more.
     * `/` divides floats; constants become floats (`7 / 2` is 3.5) and an
-      integer operand is an error. `//` and `%` work on integers only,
-      rounding toward negative infinity.
+      integer operand is an error. `//` and `%` round toward negative
+      infinity, on integers and on floats.
     * A truth test (a condition, an operand of `not`/`and`/`or`, `bool(x)`)
       takes a bool or an integer. A float is an error: NaN would count as
       true and -0.0 as false, so the program must compare explicitly.
@@ -505,16 +505,6 @@ class SemanticAnalyzer:
         if types.BOOL in (left, right):
             self._diagnostics.error(codes.BOOL_OPERATOR, expr.operator_location, op=expr.operator)
             return None
-        if expr.operator in ("//", "%"):
-            floats = [info for info in (left, right) if info is _UNTYPED_FLOAT or (isinstance(info, ScalarType) and info.is_float)]
-            if floats:
-                type_ = types.DEFAULT_FLOAT if floats[0] is _UNTYPED_FLOAT else floats[0]
-                help = ("use '/' for float division, or convert to an integer first: i64(x) // n"
-                        if expr.operator == "//" else
-                        "convert to an integer first: i64(x) % n; a float remainder is not available yet")
-                self._diagnostics.error(codes.INTEGER_OPERATOR, expr.operator_location,
-                                        op=expr.operator, type=type_, help=help)
-                return None
         if expr.operator == "/" and isinstance(left, _Const) and isinstance(right, _Const):
             return _UNTYPED_FLOAT  # `7 / 2` is 3.5: the literals become floats
         if expr.operator == "**" and isinstance(left, _Const) and isinstance(right, _Const):

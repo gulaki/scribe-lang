@@ -869,6 +869,10 @@ class CEmitter:
                 # negative base and a fractional exponent; never undefined.
                 function = self._library("powf" if t == types.F32 else "pow")
                 return f"{function}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"
+            if expr.operator in ("//", "%"):
+                name = "scribe_floordiv" if expr.operator == "//" else "scribe_mod"
+                helper = self._use(f"{name}_f32" if t == types.F32 else f"{name}_f64")
+                return f"{helper}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"
             if expr.operator == "/" and not self._nonzero_constant(expr.right):
                 helper = self._use("scribe_div_f32" if t == types.F32 else "scribe_div_f64")
                 return f"{helper}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"

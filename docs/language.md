@@ -325,12 +325,9 @@ print 7 % -3
 stops the program; dividing a float by 0 with `/` gives `inf` or `nan`.
 
 ```scribe-error
-# expect: E0511 at 4:9
-# expect: E0510 at 6:9
+# expect: E0511 at 3:9
 n = 7
 print n / 2
-x = 7.5
-print x // 2
 ```
 
 ### Powers
