@@ -25,6 +25,8 @@ def run_cli(*args):
 @pytest.mark.parametrize("args, message", [
     (["--shell", "node"], "--shell needs --target wasm"),
     (["--target", "c", "--shell", "node"], "--shell needs --target wasm"),
+    (["--web-assets", "cdn"], "--web-assets needs --target wasm"),
+    (["--target", "wasm", "--shell", "node", "--web-assets", "cdn"], "--web-assets needs --shell web"),
 ])
 def test_options_that_need_another_option_are_errors(source, capsys, args, message):
     with pytest.raises(SystemExit) as exit_:
@@ -92,3 +94,88 @@ def test_the_maths_library_is_linked_when_needed(source):
     source.write_text("x = 2.0\nprint x ** 0.5\n", encoding="utf-8")
     assert run_cli(source, "--target", "wasm", "--shell", "node", "--build", "make") == 0
     assert "LDLIBS ?= -lm\n" in (source.parent / "answer" / "Makefile").read_text(encoding="utf-8")
+
+
+# -- the web shell ----------------------------------------------------------------------
+
+VENDORED = ["xterm.css", "xterm.js", "addon-fit.js", "xterm-pty.js"]
+
+
+def web_folder(source, *args):
+    assert run_cli(source, "--target", "wasm", *args) == 0
+    return source.parent / "answer"
+
+
+def test_web_is_the_default_shell_and_vendors_the_libraries(source):
+    folder = web_folder(source)
+    names = sorted(p.name for p in folder.iterdir())
+    assert names == sorted([".scribe-wasm", "answer.c", "index.html", "scribe-term.js", "scribe-term.css",
+                            "emscripten-pty.js", "LICENSES.txt", *VENDORED])
+    page = (folder / "index.html").read_text(encoding="utf-8")
+    assert '<body data-program="answer">' in page and "<title>answer</title>" in page
+    for file in VENDORED:
+        assert f'"{file}"' in page
+    assert "cdn.jsdelivr.net" not in page and "{{" not in page
+
+
+def test_cdn_assets_are_linked_with_their_hashes(source):
+    folder = web_folder(source, "--web-assets", "cdn")
+    page = (folder / "index.html").read_text(encoding="utf-8")
+    assert page.count('integrity="sha384-') == len(VENDORED)
+    assert 'src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"' in page
+    names = {p.name for p in folder.iterdir()}
+    # emcc reads emscripten-pty.js, so it is copied either way.
+    assert "emscripten-pty.js" in names and not names & set(VENDORED)
+
+
+def test_switching_to_cdn_removes_the_vendored_copies(source):
+    web_folder(source)
+    folder = web_folder(source, "--web-assets", "cdn")
+    assert not {p.name for p in folder.iterdir()} & set(VENDORED)
+
+
+def test_the_vendored_files_match_the_manifest_hashes():
+    import base64
+    import hashlib
+    from pathlib import Path
+
+    from scribe_lang.wasm import manifest
+
+    vendor = Path(__file__).resolve().parent.parent / "scribe_lang" / "web" / "vendor"
+    for library in manifest()["libraries"]:
+        assert (vendor / library["license"]).exists()
+        for entry in library["files"]:
+            data = (vendor / entry["file"]).read_bytes()
+            if entry["kind"] != "build":
+                digest = base64.b64encode(hashlib.sha384(data).digest()).decode()
+                assert entry["integrity"] == f"sha384-{digest}", entry["file"]
+                assert library["version"] in entry["url"]
+
+
+def test_licenses_list_the_copied_libraries(source):
+    vendored = (web_folder(source) / "LICENSES.txt").read_text(encoding="utf-8")
+    assert "@xterm/xterm 5.5.0" in vendored and "xterm-pty 0.12.0" in vendored
+    cdn = (web_folder(source, "--web-assets", "cdn") / "LICENSES.txt").read_text(encoding="utf-8")
+    assert "xterm-pty 0.12.0" in cdn and "@xterm/xterm" not in cdn
+
+
+def test_web_makefile(source):
+    text = (web_folder(source, "--build", "make") / "Makefile").read_text(encoding="utf-8")
+    assert "CFLAGS ?= -std=c11 -O2 -DSCRIBE_COLOR_ERRORS\n" in text
+    assert "-sASYNCIFY -sFORCE_FILESYSTEM" in text and "--js-library=emscripten-pty.js" in text
+    assert "answer.mjs: answer.c\n" in text
+
+
+def test_the_page_script_is_valid_javascript(tmp_path):
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node not installed")
+    script = Path(__file__).resolve().parent.parent / "scribe_lang" / "web" / "scribe-term.js"
+    module = tmp_path / "scribe-term.mjs"  # node --check reads .mjs as a module
+    module.write_text(script.read_text(encoding="utf-8"), encoding="utf-8")
+    check = subprocess.run([node, "--check", str(module)], capture_output=True, text=True)
+    assert check.returncode == 0, check.stderr

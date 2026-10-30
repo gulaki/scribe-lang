@@ -11,7 +11,7 @@ from .compiler import Compiler
 from .diagnostics import Diagnostics
 from .render import render_json, render_text
 from .version import version
-from .wasm import SHELLS, WasmError, default_folder, write_folder
+from .wasm import SHELLS, WEB_ASSETS, WasmError, default_folder, write_folder
 
 # Exit codes. 2 is what argparse uses for a bad command line.
 EXIT_OK = 0
@@ -31,7 +31,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--target", choices=["c", "wasm"], default="c", help="what to build (default: c)")
     p.add_argument(
         "--shell", choices=sorted(SHELLS),
-        help="with --target wasm: where the program runs (default: node)",
+        help="with --target wasm: where the program runs, a browser terminal or node (default: web)",
+    )
+    p.add_argument(
+        "--web-assets", choices=WEB_ASSETS,
+        help="with --shell web: copy the terminal's JavaScript libraries into the folder, "
+             "or load them from a CDN (default: vendored)",
     )
     p.add_argument("--ast", action="store_true", help="print the AST")
     p.add_argument("--build", choices=["make", "ninja"], help="also generate a build file")
@@ -54,8 +59,13 @@ def _check_options(parser: argparse.ArgumentParser, args) -> None:
     it, so a flag never silently does nothing."""
     if args.shell is not None and args.target != "wasm":
         parser.error("--shell needs --target wasm")
+    if args.web_assets is not None and args.target != "wasm":
+        parser.error("--web-assets needs --target wasm")
+    if args.web_assets is not None and args.shell == "node":
+        parser.error("--web-assets needs --shell web")
     if args.target == "wasm":
-        args.shell = args.shell or "node"
+        args.shell = args.shell or "web"
+        args.web_assets = args.web_assets or "vendored"
     elif args.output is None:
         args.output = Path("out.c")
 
@@ -122,7 +132,7 @@ def _build_wasm(args, compiler: Compiler, source: str, filename: str) -> int:
         print(result.ast)
     folder = args.output or default_folder(args.source)
     try:
-        write_folder(result, args.source, folder, args.shell, args.build)
+        write_folder(result, args.source, folder, args.shell, args.build, args.web_assets)
     except (WasmError, OSError) as exc:
         reason = exc.strerror if isinstance(exc, OSError) and exc.strerror else str(exc)
         print(f"scribe: error: {reason}", file=sys.stderr)

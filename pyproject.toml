@@ -22,4 +22,4 @@ include = ["scribe_lang*"]
 version = {file = "VERSION.txt"}
 
 [tool.setuptools.package-data]
-scribe_lang = ["grammar/*.lark"]
+scribe_lang = ["grammar/*.lark", "web/*.html", "web/*.js", "web/*.css", "web/*.json", "web/vendor/*"]

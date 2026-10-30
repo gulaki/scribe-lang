@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<script>
+  // Before anything is drawn: the saved theme, else the system's, so the
+  // page never flashes the wrong colours. scribe-term.js keeps it updated.
+  (function () {
+    var choice = null;
+    try { choice = localStorage.getItem("scribe-term-theme"); } catch (e) {}
+    var dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.dataset.theme =
+      choice === "light" || choice === "dark" ? choice : (dark ? "dark" : "light");
+  })();
+</script>
+{{STYLES}}
+<link rel="stylesheet" href="scribe-term.css">
+</head>
+<body data-program="{{PROGRAM}}">
+<header>
+  <span class="title">{{TITLE}}</span>
+  <label>Theme
+    <select id="theme">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+  </label>
+  <button id="rerun" type="button" title="Start the program again">Rerun</button>
+</header>
+<main id="terminal"></main>
+<p id="file-warning" hidden>
+  Browsers do not load WebAssembly from a <code>file://</code> page. Serve this folder instead:
+  <code>python -m http.server</code>, then open <code>http://localhost:8000</code>.
+</p>
+{{SCRIPTS}}
+<script type="module" src="scribe-term.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+/* Page around the terminal. The terminal's own colours are set by
+   scribe-term.js; these follow the same light/dark choice. */
+:root[data-theme="light"] {
+  --page: #f3f3f3;
+  --bar: #e4e4e4;
+  --text: #1e1e1e;
+  --border: #c8c8c8;
+  --terminal: #ffffff;
+}
+:root[data-theme="dark"] {
+  --page: #181818;
+  --bar: #252526;
+  --text: #e6e6e6;
+  --border: #3c3c3c;
+  --terminal: #1e1e1e;
+}
+html, body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+  color: var(--text);
+  font: 14px system-ui, sans-serif;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--bar);
+  border-bottom: 1px solid var(--border);
+}
+header .title {
+  flex: 1;
+  font-weight: 600;
+}
+select, button {
+  font: inherit;
+  color: inherit;
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+button {
+  cursor: pointer;
+}
+#terminal {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  background: var(--terminal);
+}
+#file-warning {
+  margin: 12px;
+}

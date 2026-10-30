@@ -1,0 +1,54 @@
+{
+  "about": "Third-party files for the web shell. 'vendored' copies vendor/<file> into the program's folder; 'cdn' links the URL with its SRI hash instead. A 'build' file is read by emcc, so it is always copied. tests/test_wasm.py checks every hash against vendor/.",
+  "libraries": [
+    {
+      "name": "@xterm/xterm",
+      "version": "5.5.0",
+      "license": "xterm.LICENSE",
+      "files": [
+        {
+          "file": "xterm.css",
+          "kind": "style",
+          "url": "https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css",
+          "integrity": "sha384-8Xk9wy/gzEDUKrXtrmCFa2bBuK3BpjpDuL/p0SeKQX19Khl/M+lHOgD/CyYf7efP"
+        },
+        {
+          "file": "xterm.js",
+          "kind": "script",
+          "url": "https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js",
+          "integrity": "sha384-M169f14mRZOXm3hD/v2Ti0ThIT/RnAQagXA9nlE15yHAtrW19gdePJh/HaTzUOe/"
+        }
+      ]
+    },
+    {
+      "name": "@xterm/addon-fit",
+      "version": "0.10.0",
+      "license": "addon-fit.LICENSE",
+      "files": [
+        {
+          "file": "addon-fit.js",
+          "kind": "script",
+          "url": "https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js",
+          "integrity": "sha384-iF+jqbuti4XlB64clWgFWYEscb+UnSRv3VgVikGYZu+otNFnSHr7y7NcKfBnGizn"
+        }
+      ]
+    },
+    {
+      "name": "xterm-pty",
+      "version": "0.12.0",
+      "license": "xterm-pty.LICENSE",
+      "files": [
+        {
+          "file": "xterm-pty.js",
+          "kind": "script",
+          "url": "https://cdn.jsdelivr.net/npm/xterm-pty@0.12.0/index.js",
+          "integrity": "sha384-GcBNWFeEdk/PXHMfiSGZa8WsOmC1zxmeHyp9TIfPw7cSF8zGw4NXCI8SEX5+qyoO"
+        },
+        {
+          "file": "emscripten-pty.js",
+          "kind": "build"
+        }
+      ]
+    }
+  ]
+}
