@@ -99,7 +99,7 @@ prog.scribe:4:11: runtime error: integer overflow
 | Message | Cause |
 |---|---|
 | `integer overflow` | An i64 `+`, `-`, `*`, `//`, `**` or negation whose result does not fit, including `-9223372036854775808 // -1`. |
-| `division by zero` | An i64 `//` or `%` by zero. Float division by zero is defined: it gives `inf` or `nan`. |
+| `division by zero` | An i64 `//` or `%` by zero. Float `/`, `//` and `%` by zero are defined: they give `inf` or `nan`. |
 | `negative exponent` | An i64 `**` whose exponent is negative: the result would not be an integer. Raise a float instead: `2.0 ** -1`. |
 | `value out of range for i64` | `i64(x)` where `x` is NaN, infinite, or outside the range of i64. |
 

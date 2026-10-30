@@ -25,9 +25,9 @@ The type system is built in numbered tasks, each starting from failing tests.
 | 7 | `f16`, `f128`, per target | planned |
 | 8 | Range analysis that removes provably safe checks | planned |
 | 9 | `/` divides floats; integer `//` and `%`, rounding down | done |
+| 10 | Float `//` and `%`: exact floor and remainder, rounded once | done |
 
-Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`);
-`//` and `%` for floats, now that programs can link the C maths library; and
+Also planned, not yet numbered: wrapping operators (`+%`, `wrap_u8(x)`); and
 `floor(x)` and the other maths functions, with function calls and `use math`.
 Functions themselves are drafted in [functions.md](functions.md) and
 [runtime-errors.md](runtime-errors.md).
@@ -179,18 +179,32 @@ are often not visible where the division is written.
 | Operator | Operands | Result |
 |---|---|---|
 | `/` | floats, and integer constants (which become floats) | IEEE 754 division: `7 / 2` is 3.5, `1 / 0` is inf |
-| `//` | integers | the quotient rounded toward negative infinity: `-7 // 2` is -4 |
-| `%` | integers | the remainder of `//`: `a == (a // b) * b + a % b`, with the sign of `b` |
+| `//` | integers and floats | the quotient rounded toward negative infinity: `-7 // 2` is -4 |
+| `%` | integers and floats | the remainder of `//`: `a == (a // b) * b + a % b`, with the sign of `b` |
 
 - `/` with an integer variable is an error (E0511) whose help offers `//` or
   `f64(a) / f64(b)`. Making `n / m` an f64 silently, as Python does, would
   round integers above 2^53 before dividing, which breaks the
   lossless-or-error rule. So `f64: a = 7 / 2` is 3.5, and `i64: a = 7 / 2`
   is a type mismatch (E0501), not a silent 3.
-- `//` and `%` on a float are an error (E0510). Float floor division and
-  remainder will come with a small maths library (`floor(x)`, with `**`):
-  `floor(a / b)` is not Python's `a // b` (`1 // 0.1` is 9.0, but
-  `floor(1 / 0.1)` is 10.0), and both need `-lm` when linking.
+- On floats, `//` and `%` are exact on the stored values, rounded once:
+  `x // y` is the floor of the exact quotient, and `x % y` is
+  `x - y * (x // y)` computed exactly, then rounded. `floor(x / y)` is wrong,
+  because the quotient is rounded before the floor: `1 // 0.1` is 9.0 (the
+  float 0.1 is a little more than one tenth), but `floor(1 / 0.1)` is
+  `floor(10.0)`. Past 2^53 (2^24 for f32) every float is an integer, and
+  `x // y` is the rounded quotient, within one ulp of the exact floor.
+  `%` may round to `y` itself: `-1e-100 % 1e100` is `1e100`, the nearest
+  float.
+- Python agrees with `%` exactly. Its `//` is one off in rare cases with
+  quotients near 2^52 and above, because it divides `x - x % y` by `y`,
+  rounding twice, and it gives `nan` for `inf // y`, where Scribe gives
+  `±inf`.
+- Like `/`, a zero divisor gives the IEEE 754 result instead of stopping:
+  `x // 0.0` is ±inf (nan for `0.0 // 0.0`), `x % 0.0` is nan, and so is
+  `inf % y`. The C helpers `scribe_floordiv_f64` and `scribe_mod_f64` (and
+  their f32 versions) handle these first, so C's `fmod` never meets the
+  cases it leaves implementation-defined, and they need `-lm`.
 - Rounding down, rather than C's truncation, matches Python and gives `%` the
   sign of the divisor, which is what wrap-around and index arithmetic need.
   The C helpers `scribe_floordiv_i64` and `scribe_mod_i64` adjust C's
