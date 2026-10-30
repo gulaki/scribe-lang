@@ -97,7 +97,9 @@ Today the pipeline is `parse -> AST -> semantics (scopes and types) -> C text`. 
 | M8 | generics, iterators | constraints checked at the definition, invalidation rules |
 | M9 | reference counting | cycle policy |
 
-Stages are plans, not versions: released versions and what each one changed are in [`CHANGELOG.md`](../CHANGELOG.md), and stage M2 so far spans versions 0.3.0 to 0.5.1.
+Stages are plans, not versions: released versions and what each one changed are in [`CHANGELOG.md`](../CHANGELOG.md), and stage M2 so far spans versions 0.3.0 to 0.6.0.
+
+**Deployment targets (off the stages).** Programs also build as WebAssembly, for Node or for a browser terminal (xterm.js with xterm-pty), from the same C: a proof that the C-first design deploys anywhere a C compiler reaches. A later step, once `use` and `extern` exist, is a `dom` module with JavaScript bindings, for programs with a web UI rather than a terminal ([lowering.md](design/lowering.md#targets)).
 
 Order rationale: types before functions (signatures need them), arrays before structs (forces the runtime-template and heap machinery early, on the simplest type), functions with their error model before any heap type (cleanups need the error exits), ownership and classes before generics (generics over owned types are the hard case).
 

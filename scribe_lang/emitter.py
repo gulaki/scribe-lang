@@ -123,7 +123,12 @@ _HELPERS: dict[str, _Helper] = {
     "scribe_trap": _helper("""
 /* Stops the program at a failed runtime check. */
 static _Noreturn void scribe_trap(int site, const char *what) {
+#ifdef SCRIBE_COLOR_ERRORS
+    /* Defined by the web shell's build: its stderr is always a terminal. */
+    fprintf(stderr, "\\033[31m%s: runtime error: %s\\033[0m\\n", scribe_sites[site], what);
+#else
     fprintf(stderr, "%s: runtime error: %s\\n", scribe_sites[site], what);
+#endif
     abort();
 }
 """, includes=["stdio.h", "stdlib.h"]),

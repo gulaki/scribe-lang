@@ -11,6 +11,11 @@ class BuildConfig:
     cflags: tuple[str, ...] = ("-std=c11", "-O2", "-Wall", "-Wextra")
     # Libraries to link, such as ("m",) for the C maths library.
     libraries: tuple[str, ...] = ()
+    # Flags for the link step, such as Emscripten's -sASYNCIFY.
+    ldflags: tuple[str, ...] = ()
+    # Files the compiler writes next to the output, such as the .wasm beside
+    # Emscripten's .js; relative to the build file.
+    side_outputs: tuple[str, ...] = ()
 
     @property
     def ldlibs(self) -> str:
@@ -27,6 +32,11 @@ def _relative_to(path: Path, build_file: Path) -> str:
     return Path(os.path.relpath(Path(path).resolve(), Path(build_file).resolve().parent)).as_posix()
 
 
+def _joined(flags: tuple[str, ...]) -> str:
+    """` a b c` for a `NAME =` line, or nothing when there are no flags."""
+    return "".join(f" {flag}" for flag in flags)
+
+
 class BuildSystem:
     name = "base"
 
@@ -41,15 +51,26 @@ class MakeBuildSystem(BuildSystem):
         flags = " ".join(config.cflags)
         src = _relative_to(source, build_file)
         exe = _relative_to(output, build_file)
+        # make 3.81, which macOS ships, has no grouped targets, so a side
+        # output is not a target of its own: deleting only it does not make
+        # it rebuild (`make clean` removes it).
+        side = "".join(f"# Also writes {name}.\n" for name in config.side_outputs)
         return (
-            f"CC ?= {config.compiler}\n"
+            # Make predefines CC (as `cc`), so `CC ?= emcc` would never take
+            # effect. Replace only that built-in default: a CC given in the
+            # environment or on the command line still wins.
+            f"ifeq ($(origin CC),default)\n"
+            f"CC = {config.compiler}\n"
+            f"endif\n"
             f"CFLAGS ?= {flags}\n"
+            f"LDFLAGS ?={_joined(config.ldflags)}\n"
             f"LDLIBS ?={' ' + config.ldlibs if config.ldlibs else ''}\n\n"
             f"all: {exe}\n\n"
+            f"{side}"
             f"{exe}: {src}\n"
-            f"\t$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)\n\n"
+            f"\t$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)\n\n"
             f"clean:\n"
-            f"\trm -f {exe}\n"
+            f"\trm -f {' '.join([exe, *config.side_outputs])}\n"
         )
 
 
@@ -60,14 +81,16 @@ class NinjaBuildSystem(BuildSystem):
         flags = " ".join(config.cflags)
         src = _relative_to(source, build_file)
         exe = _relative_to(output, build_file)
+        implicit = f" | {' '.join(config.side_outputs)}" if config.side_outputs else ""
         return (
             f"cc = {config.compiler}\n"
             f"cflags = {flags}\n"
+            f"ldflags ={_joined(config.ldflags)}\n"
             f"libs ={' ' + config.ldlibs if config.ldlibs else ''}\n\n"
             f"rule cc\n"
-            f"  command = $cc $cflags -o $out $in $libs\n"
+            f"  command = $cc $cflags $ldflags -o $out $in $libs\n"
             f"  description = CC $out\n\n"
-            f"build {exe}: cc {src}\n"
+            f"build {exe}{implicit}: cc {src}\n"
         )
 
 

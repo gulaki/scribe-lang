@@ -3,3 +3,7 @@ __pycache__/
 *.c
 *.exe
 build/
+# Program folders that `scribe --target wasm` writes next to an example.
+examples/*/
+!examples/errors/
+!examples/future/
