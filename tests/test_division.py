@@ -6,7 +6,7 @@ import pytest
 from scribe_lang.diagnostics import Diagnostics
 from scribe_lang.parser import Parser
 from scribe_lang.semantics import SemanticAnalyzer
-from scribe_lang.types import I64
+from scribe_lang.types import F32, F64, I64
 
 PARSER = Parser()
 INT64_MIN = -2**63
@@ -59,18 +59,27 @@ def test_constant_floor_division_overflow_is_an_error():
     assert positions("print -9223372036854775808 // -1\n") == [("E0503", 1, 7)]
 
 
-@pytest.mark.parametrize("source, position, op, type_", [
-    ("x = 7.0\nprint x // 2\n", (2, 9), "//", "f64"),
-    ("x = 7.0\nprint x % 2\n", (2, 9), "%", "f64"),
-    ("print 7.5 // 2\n", (1, 11), "//", "f64"),
-    ("print 7 % 2.5\n", (1, 9), "%", "f64"),
-    ("y = 1.5f\nprint y // y\n", (2, 9), "//", "f32"),
+@pytest.mark.parametrize("source, name, type_", [
+    ("x = 7.0\nz = x // 2\n", "z", F64),
+    ("x = 7.0\nz = x % 2\n", "z", F64),
+    ("z = 7.5 // 2\n", "z", F64),
+    ("z = 7 % 2.5\n", "z", F64),
+    ("y = 1.5f\nz = y // y\n", "z", F32),
+    ("y = 1.5f\nz = y % 2\n", "z", F32),
 ])
-def test_floor_division_and_remainder_need_integers(source, position, op, type_):
-    found = analyze(source)[0]
-    assert [(d.code.code, d.span.line, d.span.column) for d in found] == [("E0510", *position)]
-    assert found[0].message == f"'{op}' works on integers, not {type_}"
-    assert "i64(x)" in found[0].help
+def test_floor_division_and_remainder_work_on_floats(source, name, type_):
+    found, model = analyze(source)
+    assert found == []
+    assert model.root.symbols[name].type is type_
+
+
+@pytest.mark.parametrize("source, position", [
+    ("x = 7.0\nn = 2\nprint x % n\n", (3, 9)),
+    ("y = 1.5f\nn = 2\nprint y // n\n", (3, 9)),
+])
+def test_floor_division_and_remainder_do_not_mix_floats_and_integers(source, position):
+    # As for every other operator: an integer variable never becomes a float silently.
+    assert positions(source) == [("E0502", *position)]
 
 
 def test_floor_division_of_a_bool_is_a_bool_error():
