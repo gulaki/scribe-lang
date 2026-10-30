@@ -179,3 +179,16 @@ def test_the_page_script_is_valid_javascript(tmp_path):
     module.write_text(script.read_text(encoding="utf-8"), encoding="utf-8")
     check = subprocess.run([node, "--check", str(module)], capture_output=True, text=True)
     assert check.returncode == 0, check.stderr
+
+
+# -- red runtime errors --------------------------------------------------------------------
+
+CRASH = "x = 9223372036854775807\ny = x + 1\n"
+
+
+def test_runtime_errors_are_red_when_scribe_color_errors_is_defined(build_scribe):
+    plain = build_scribe(CRASH, [])("")
+    red = build_scribe(CRASH, ["-DSCRIBE_COLOR_ERRORS"])("")
+    assert plain.stderr == "t.scribe:2:7: runtime error: integer overflow\n"
+    assert red.stderr == "\x1b[31mt.scribe:2:7: runtime error: integer overflow\x1b[0m\n"
+    assert plain.returncode != 0 and red.returncode != 0
