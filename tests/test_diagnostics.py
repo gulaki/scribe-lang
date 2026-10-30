@@ -25,6 +25,14 @@ def test_registering_a_code_twice_is_refused():
     assert "E9998" not in d.CODES
 
 
+def test_a_retired_code_or_name_is_never_reused():
+    with pytest.raises(ValueError, match="retired"):
+        d._register("E0510", "something-new", "x")
+    with pytest.raises(ValueError, match="retired"):
+        d._register("E9998", "integer-only-operator", "x")
+    assert not set(d.RETIRED) & set(d.CODES)
+
+
 def test_every_template_formats_with_its_own_placeholders():
     # A typo such as an unescaped brace would otherwise only fail when that
     # error is first reported.
@@ -79,5 +87,12 @@ def test_every_code_is_documented():
     from pathlib import Path
 
     doc = (Path(__file__).resolve().parent.parent / "docs" / "errors.md").read_text(encoding="utf-8")
-    rows = set(re.findall(r"^\| ([EW]\d{4}) \| ([a-z-]+) \|", doc, re.MULTILINE))
-    assert rows == {(code.code, code.name) for code in d.CODES.values()}
+    before, retired = doc.split("### Retired codes", 1)
+    retired, after = retired.split("\n## ", 1)
+    current = before + after
+
+    def rows(text):
+        return set(re.findall(r"^\| ([EW]\d{4}) \| ([a-z-]+) \|", text, re.MULTILINE))
+
+    assert rows(current) == {(code.code, code.name) for code in d.CODES.values()}
+    assert rows(retired) == set(d.RETIRED.items())

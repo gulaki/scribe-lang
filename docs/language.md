@@ -35,8 +35,8 @@ echo 5 | build/sum
 ```
 
 `scribe` is installed by `pip install -e .`; `python -m scribe_lang.cli` does
-the same. A program that uses a C library function, so far only a float `**`,
-starts its C file with a comment such as `/* Link with: -lm */`: add `-lm`
+the same. A program that uses a C library function, so far a float `**`,
+`//` or `%`, starts its C file with a comment such as `/* Link with: -lm */`: add `-lm`
 at the end of the `cc` command. (`--build make` and `--build ninja` do this
 for you.)
 
@@ -301,6 +301,8 @@ There are three operators, and each one does one thing:
   Python: `-7 // 2` is `-4`.
 - `%` is the remainder of `//`, so `a == (a // b) * b + a % b`, and the
   result has the sign of `b`: `-7 % 3` is `2`, `7 % -3` is `-2`.
+- `//` and `%` work on floats too, with the same meaning: `-7.5 // 2` is
+  `-4.0` and `-7.5 % 2` is `0.5`.
 
 ```scribe
 print 7 / 2
@@ -321,16 +323,39 @@ print 7 % -3
 -2
 ```
 
-`//` and `%` work only on integers. Dividing an integer by 0 with `//` or `%`
-stops the program; dividing a float by 0 with `/` gives `inf` or `nan`.
+Dividing an integer by 0 with `//` or `%` stops the program. Dividing a
+float by 0 gives `inf` or `nan`, as IEEE 754 does: `x / 0.0` and `x // 0.0`
+are `inf` or `-inf` (`nan` when `x` is 0), and `x % 0.0` is `nan`.
+
+On floats, `//` and `%` are exact on the values the floats hold. A float
+such as `0.1` is a binary fraction, a little more than one tenth, so 1
+holds it only 9 whole times, and `1 // 0.1` is `9.0`, with remainder
+`0.09999999999999995`. Rounding `1 / 0.1` first would give `10.0`, which is
+how `floor(a / b)` goes wrong. Scribe computes the exact floor of the
+quotient, and the exact remainder rounded once, as IEEE 754 does for `+`,
+`-`, `*` and `/`. Past 2^53 (2^24 for `f32`), where every float is a whole
+number, `a // b` is `a / b` rounded.
+
+```scribe
+print 1 // 0.1
+print -7.5 // 2
+print -7.5 % 2
+print 7.5 % -2
+```
+
+```output
+9.00
+-4.00
+0.50
+-0.50
+```
+
+These call C's maths library, so the C file asks for `-lm`.
 
 ```scribe-error
-# expect: E0511 at 4:9
-# expect: E0510 at 6:9
+# expect: E0511 at 3:9
 n = 7
 print n / 2
-x = 7.5
-print x // 2
 ```
 
 ### Powers

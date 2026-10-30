@@ -23,6 +23,22 @@ requests; only 0.0.1 and 0.1.0 were named at the time. The roadmap's stages (M1,
 [`docs/whitepaper.md`](docs/whitepaper.md#4-roadmap)) are plans, not version
 numbers.
 
+## Unreleased
+
+### Added
+
+- `//` and `%` on floats (f64 and f32), exact on the values the floats
+  hold: `x // y` is the floor of the exact quotient and `x % y` the exact
+  remainder, each rounded once. `1 // 0.1` is 9.0, because the float 0.1 is
+  a little more than one tenth. A zero divisor gives `inf` or `nan`, as for
+  `/`. Programs that use them link with `-lm`.
+
+### Removed
+
+- Error E0510 (`//` or `%` on a float). The code is retired and will not be
+  reused; [`docs/errors.md`](docs/errors.md#retired-codes) lists retired
+  codes.
+
 ## 0.6.1 - 2026-10-30
 
 Pull request #11.

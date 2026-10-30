@@ -103,10 +103,11 @@ class _Helper:
     lines: tuple[str, ...]
     includes: tuple[str, ...] = ()
     needs: tuple[str, ...] = ()  # other helpers it calls
+    libraries: tuple[str, ...] = ()  # to link with: "m" for -lm
 
 
-def _helper(code: str, includes=(), needs=()) -> _Helper:
-    return _Helper(tuple(code.strip("\n").split("\n")) + ("",), tuple(includes), tuple(needs))
+def _helper(code: str, includes=(), needs=(), libraries=()) -> _Helper:
+    return _Helper(tuple(code.strip("\n").split("\n")) + ("",), tuple(includes), tuple(needs), tuple(libraries))
 
 
 # Every check stops the program through scribe_trap, which says where in the
@@ -252,6 +253,93 @@ static float scribe_div_f32(float a, float b) {
     return a / b;
 }
 """, includes=["math.h"]),
+    # `//` and `%` on floats are exact on the values the floats hold, rounded
+    # once, as IEEE 754 rounds + - * /. C has no float floor division, and
+    # floor(a / b) rounds the quotient first: 1 // 0.1 is 9 (0.1 is a little
+    # more than one tenth), but floor(1 / 0.1) is floor(10.0).
+    #
+    # Quotient: d = a / b is rounded, but rounding never reverses order, so
+    # with c = floor(d) the exact floor is c or c - 1. fma gives a - c*b
+    # rounded once, which has the exact sign: it is c - 1 when that sign
+    # differs from b's. Past 2^53 (2^24 for f32) every float is an integer
+    # and d is the result, within one ulp of the exact floor.
+    #
+    # Remainder: fmod is always exact (C11 7.12.10.1) and has the sign of a;
+    # when that differs from b's sign, adding b is the one rounding. It may
+    # round to b itself: -1e-100 % 1e100 is 1e100, the nearest float.
+    #
+    # A nan, an infinite a or a zero b gives the IEEE 754 result directly, so
+    # fmod never sees the cases C leaves implementation-defined.
+    "scribe_floordiv_f64": _helper("""
+static double scribe_floordiv_f64(double a, double b) {
+    if (isnan(a) || isnan(b) || isinf(a) || b == 0.0) {
+        return scribe_div_f64(a, b);
+    }
+    if (isinf(b)) {
+        return a != 0.0 && (signbit(a) != 0) != (signbit(b) != 0) ? -1.0 : a / b;
+    }
+    double d = a / b;
+    if (d > 0x1p53 || d < -0x1p53) {
+        return d;
+    }
+    double c = floor(d);
+    double t = fma(-c, b, a);
+    if (t != 0.0 && (t < 0.0) != (b < 0.0)) {
+        c = c - 1.0;
+    }
+    return c;
+}
+""", includes=["math.h"], needs=["scribe_div_f64"], libraries=["m"]),
+    "scribe_mod_f64": _helper("""
+static double scribe_mod_f64(double a, double b) {
+    if (isnan(a) || isnan(b) || isinf(a) || b == 0.0) {
+        return NAN;
+    }
+    double r = isinf(b) ? a : fmod(a, b);
+    if (r == 0.0) {
+        return signbit(b) != 0 ? -0.0 : 0.0;
+    }
+    if ((r < 0.0) != (b < 0.0)) {
+        r = r + b;
+    }
+    return r;
+}
+""", includes=["math.h"], libraries=["m"]),
+    "scribe_floordiv_f32": _helper("""
+static float scribe_floordiv_f32(float a, float b) {
+    if (isnan(a) || isnan(b) || isinf(a) || b == 0.0f) {
+        return scribe_div_f32(a, b);
+    }
+    if (isinf(b)) {
+        return a != 0.0f && (signbit(a) != 0) != (signbit(b) != 0) ? -1.0f : a / b;
+    }
+    float d = a / b;
+    if (d > 0x1p24f || d < -0x1p24f) {
+        return d;
+    }
+    float c = floorf(d);
+    float t = fmaf(-c, b, a);
+    if (t != 0.0f && (t < 0.0f) != (b < 0.0f)) {
+        c = c - 1.0f;
+    }
+    return c;
+}
+""", includes=["math.h"], needs=["scribe_div_f32"], libraries=["m"]),
+    "scribe_mod_f32": _helper("""
+static float scribe_mod_f32(float a, float b) {
+    if (isnan(a) || isnan(b) || isinf(a) || b == 0.0f) {
+        return NAN;
+    }
+    float r = isinf(b) ? a : fmodf(a, b);
+    if (r == 0.0f) {
+        return signbit(b) != 0 ? -0.0f : 0.0f;
+    }
+    if ((r < 0.0f) != (b < 0.0f)) {
+        r = r + b;
+    }
+    return r;
+}
+""", includes=["math.h"], libraries=["m"]),
     # A float -> integer conversion of a value out of range (or NaN) is
     # undefined (C11 6.3.1.4). NaN fails both comparisons; both bounds are
     # powers of two, so they are exact doubles.
@@ -518,6 +606,7 @@ class CEmitter:
             self._helpers.add(name)
             helper = _HELPERS[name]
             self._includes.update(helper.includes)
+            self._libraries.update(helper.libraries)
             for dependency in helper.needs:
                 self._use(dependency)
         return name
@@ -780,6 +869,10 @@ class CEmitter:
                 # negative base and a fractional exponent; never undefined.
                 function = self._library("powf" if t == types.F32 else "pow")
                 return f"{function}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"
+            if expr.operator in ("//", "%"):
+                name = "scribe_floordiv" if expr.operator == "//" else "scribe_mod"
+                helper = self._use(f"{name}_f32" if t == types.F32 else f"{name}_f64")
+                return f"{helper}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"
             if expr.operator == "/" and not self._nonzero_constant(expr.right):
                 helper = self._use("scribe_div_f32" if t == types.F32 else "scribe_div_f64")
                 return f"{helper}({_without_outer_parentheses(left)}, {_without_outer_parentheses(right)})"

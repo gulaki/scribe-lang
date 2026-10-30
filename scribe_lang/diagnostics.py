@@ -34,10 +34,18 @@ class ErrorCode:
 
 CODES: dict[str, ErrorCode] = {}
 
+# Codes no longer reported, by code and name. They stay reserved: a code or
+# name is never reused for something else.
+RETIRED: dict[str, str] = {
+    "E0510": "integer-only-operator",  # `//` and `%` on floats, allowed since 0.6.2
+}
+
 
 def _register(code: str, name: str, template: str, severity: Severity = Severity.ERROR) -> ErrorCode:
     if code in CODES:
         raise ValueError(f"diagnostic code {code} registered twice")
+    if code in RETIRED or name in RETIRED.values():
+        raise ValueError(f"diagnostic code {code} ({name}) reuses a retired code or name")
     if any(existing.name == name for existing in CODES.values()):
         raise ValueError(f"diagnostic name {name!r} registered twice")
     CODES[code] = ErrorCode(code, name, template, severity)
@@ -93,7 +101,6 @@ MIXED_COMPARISON_CHAIN = _register(
     "E0508", "mixed-comparison-chain", "a comparison chain cannot mix '{first}' and '{op}'",
 )
 CANNOT_INPUT_TYPE = _register("E0509", "cannot-input-type", "'input' cannot read a {type}")
-INTEGER_OPERATOR = _register("E0510", "integer-only-operator", "'{op}' works on integers, not {type}")
 FLOAT_DIVISION = _register("E0511", "float-only-division", "'/' divides floats, not {type}")
 NEGATIVE_EXPONENT = _register(
     "E0512", "negative-exponent", "an integer power needs an exponent of 0 or more, not {exponent}",

@@ -67,7 +67,6 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 | E0507 | chained-not-equal | `!=` in a comparison chain. `a != b != c` would not mean that all three differ. Write the pairs you mean with `and`. |
 | E0508 | mixed-comparison-chain | A comparison chain that changes direction, such as `a < b > c`, or mixes `==` with `<`. A chain is all `<`/`<=`, all `>`/`>=`, or all `==`. |
 | E0509 | cannot-input-type | `input` into a bool. Read an i64 and convert it: `bool(n)`. |
-| E0510 | integer-only-operator | `//` or `%` on a float. They work on integers only. Divide floats with `/`, or convert first: `i64(x) // 2`. A float remainder is not available yet. |
 | E0511 | float-only-division | `/` on integers. `/` divides floats, so `7 / 2` is 3.5; for whole-number division use `//`, which rounds down, or convert: `f64(a) / f64(b)`. |
 | E0512 | negative-exponent | An integer constant raised to a negative power, such as `2 ** -1`. The result would not be an integer; raise a float instead: `2.0 ** -1` is 0.5. |
 | E0601 | assignment-count-mismatch | A multiple assignment has a different number of names and values, such as `a, b = 1` or `a = 1, 2`. |
@@ -76,6 +75,15 @@ Every code has at least one example in [`examples/errors/`](../examples/errors/)
 Codes are grouped by hundreds: `E00xx` driver and internal, `E01xx` syntax,
 `E02xx` names and scopes, `E03xx` control flow (loops, labels and `goto`), `E04xx` literals,
 `E05xx` types, `E06xx` assignments.
+
+### Retired codes
+
+These codes are no longer reported. They stay reserved, so a code never
+changes meaning.
+
+| Code | Name | Retired in | Why |
+|---|---|---|---|
+| E0510 | integer-only-operator | 0.6.2 | `//` and `%` on a float. They work on floats too now. |
 
 ## Runtime errors
 
@@ -91,7 +99,7 @@ prog.scribe:4:11: runtime error: integer overflow
 | Message | Cause |
 |---|---|
 | `integer overflow` | An i64 `+`, `-`, `*`, `//`, `**` or negation whose result does not fit, including `-9223372036854775808 // -1`. |
-| `division by zero` | An i64 `//` or `%` by zero. Float division by zero is defined: it gives `inf` or `nan`. |
+| `division by zero` | An i64 `//` or `%` by zero. Float `/`, `//` and `%` by zero are defined: they give `inf` or `nan`. |
 | `negative exponent` | An i64 `**` whose exponent is negative: the result would not be an integer. Raise a float instead: `2.0 ** -1`. |
 | `value out of range for i64` | `i64(x)` where `x` is NaN, infinite, or outside the range of i64. |
 

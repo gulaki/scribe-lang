@@ -64,6 +64,8 @@ User generics are instantiated in the IR: collect reachable `(function, type-arg
 | `7 / 2` | `(7.0 / 2.0)`: the integer literals are written as floats |
 | `a // b` | `scribe_floordiv_i64(v_a, v_b, site)`: traps on 0 and `INT64_MIN // -1`, then adjusts C's truncating `/` |
 | `a % b` | `scribe_mod_i64(v_a, v_b, site)`: traps on 0, returns 0 for `b == -1`, then adjusts C's `%` |
+| `x // y` (floats) | `scribe_floordiv_f64(v_x, v_y)` (`_f32` for f32): `c = floor(x / y)`, then `c - 1` when `fma(-c, y, x)` has the other sign from `y`; the exact floor |
+| `x % y` (floats) | `scribe_mod_f64(v_x, v_y)` (`_f32` for f32): `fmod`, which is exact, then `+ y` when the signs differ, the one rounding |
 
 ## Powers (implemented)
 
@@ -78,7 +80,8 @@ User generics are instantiated in the IR: collect reachable `(function, type-arg
 Every header is included only when the program needs it, `<stdio.h>`
 included: `print`, `input` and the runtime-error reporter add it, so a
 program with none of them does not include it. Calling a C library function
-records the library it lives in (`pow` and `powf`: `m`). The compiler
+records the library it lives in (`pow` and `powf`: `m`), and so does a
+runtime helper that calls one (the float `//` and `%` helpers: `m`). The compiler
 reports the libraries in `CompilationResult.link_libraries`, the C file
 starts with a `/* Link with: -lm */` comment, and the generated Makefile
 (`LDLIBS`) and Ninja file (`libs`) link them after the source file, where
