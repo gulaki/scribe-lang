@@ -15,6 +15,11 @@ scribe examples/primes.scribe -o build/primes.c
 cc -std=c11 -o build/primes build/primes.c && echo 30 | build/primes
 ```
 
+Or in a browser, with Emscripten installed (see the main README):
+`scribe examples/primes.scribe --target wasm --build make`, then
+`make -C examples/primes` and `python -m http.server` in `examples/primes/`.
+Those folders are ignored by git.
+
 Every feature these programs use is explained in the
 [language reference](../docs/language.md).
 

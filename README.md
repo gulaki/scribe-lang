@@ -41,6 +41,31 @@ ninja -C build
 Other options: `--ast` prints the syntax tree, `--build-output PATH` puts the
 build file elsewhere, and `--diagnostics-format json` prints errors as JSON.
 
+### Run in the browser
+
+With [Emscripten](https://emscripten.org) installed (`brew install emscripten`,
+or emsdk), the same program runs as WebAssembly in a browser terminal:
+
+```sh
+scribe examples/sum_avg.scribe --target wasm --build make    # writes examples/sum_avg/
+make -C examples/sum_avg
+cd examples/sum_avg && python -m http.server                  # open http://localhost:8000
+```
+
+The page runs the program in [xterm.js](https://xtermjs.org) with
+[xterm-pty](https://github.com/mame/xterm-pty), so `input` reads from the
+terminal as it would natively, and runtime errors show in red. It has a
+System/Light/Dark theme switch, remembered for every Scribe app served from
+the same address, and a Rerun button.
+
+- `--shell node` builds for Node instead: `node examples/sum_avg/sum_avg.js`.
+- `--web-assets cdn` loads the terminal libraries from a CDN, with SRI
+  hashes, instead of copying them into the folder.
+- `-o DIR` chooses the folder; by default it is next to the source, named
+  after it. Scribe refuses to write into a folder it did not create.
+- `--build ninja` works too. Without `--build`, Scribe writes only the files
+  it generates, as for native C.
+
 ## A tour
 
 ```scribe

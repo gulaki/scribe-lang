@@ -125,6 +125,34 @@ static int64_t f_gcd__i64_i64(int64_t v_a, int64_t v_b) {
 ```
 Rules: one statement per line; locals declared and zero-initialised at the top of their block; `static` for everything except `main`; checked arithmetic through small `static` helpers, emitted only when used, so the generated code stays readable; the generated code defines no macros (it uses standard ones such as `INT64_C` and `PRId64`). All of these hold today except the ones about functions.
 
+## Targets
+
+The emitter writes one C file, the same for every target; a target only
+changes how it is built.
+
+| Target | Build | Runs in |
+|---|---|---|
+| `--target c` (default) | `cc` through the Makefile/Ninja file | the native terminal |
+| `--target wasm --shell node` | `emcc -sENVIRONMENT=node -sEXIT_RUNTIME=1` | `node prog.js` |
+| `--target wasm --shell web` (default shell) | `emcc -sASYNCIFY -sFORCE_FILESYSTEM -sMODULARIZE -sEXPORT_ES6 --js-library=emscripten-pty.js -DSCRIBE_COLOR_ERRORS` | `index.html`: xterm.js with xterm-pty |
+
+- **Blocking input in a browser.** A Scribe program reads stdin in the middle
+  of a run. Asyncify lets the WebAssembly pause on that read without blocking
+  the page, on the main thread, in every browser, served by plain
+  `python -m http.server`. The alternatives were a Worker with
+  `SharedArrayBuffer` (needs cross-origin isolation headers) and JSPI (not in
+  every browser yet); JSPI may replace Asyncify later.
+- **One C file.** Red runtime errors are a compile-time macro,
+  `SCRIBE_COLOR_ERRORS`, that only the web build defines, so the C stays ISO
+  C and identical across targets.
+- **Third-party files** are listed in `scribe_lang/web/assets.json` with their
+  CDN URLs and SRI hashes; `--web-assets vendored` copies them, `cdn` links
+  them. Tested with Emscripten 6.0.13, xterm.js 5.5.0 and xterm-pty 0.12.0;
+  xterm-pty patches Emscripten internals, so a new Emscripten may need a new
+  xterm-pty.
+- **Parity.** The tests build every example for node and compare it with the
+  native output.
+
 ## Build
 
-The CLI writes Makefile/Ninja files next to the C output (paths relative to the build file). Planned: a `--sanitize` option to build with UBSan/ASan, for CI. Today the test suite builds with UBSan itself (`SCRIBE_SANITIZE=1`).
+The CLI writes Makefile/Ninja files next to the C output (paths relative to the build file). The Makefile replaces `CC` only while it is make's built-in default, so `make CC=...` and an environment `CC` still win. Planned: a `--sanitize` option to build with UBSan/ASan, for CI. Today the test suite builds with UBSan itself (`SCRIBE_SANITIZE=1`).

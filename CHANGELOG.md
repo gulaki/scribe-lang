@@ -23,6 +23,27 @@ requests; only 0.0.1 and 0.1.0 were named at the time. The roadmap's stages (M1,
 [`docs/whitepaper.md`](docs/whitepaper.md#4-roadmap)) are plans, not version
 numbers.
 
+## Unreleased
+
+### Added
+
+- `--target wasm`: build a program as WebAssembly with Emscripten.
+  `--shell web` (the default) writes a folder with a page that runs the
+  unchanged program in a browser terminal (xterm.js with xterm-pty, input
+  through Asyncify), with runtime errors in red, a remembered
+  System/Light/Dark theme and a Rerun button; serve it with
+  `python -m http.server`. `--shell node` builds for `node`.
+- `--web-assets vendored` (the default) copies the terminal's libraries into
+  the folder; `--web-assets cdn` links them from jsDelivr with SRI hashes.
+- `--build make` and `--build ninja` work for both targets; build files take
+  link flags and extra outputs.
+
+### Fixed
+
+- Generated Makefiles now use their compiler: make predefines `CC`, so
+  `CC ?= cc` never took effect (native builds only worked because the
+  default is also `cc`).
+
 ## 0.6.0 - 2026-10-25
 
 Pull request #9.

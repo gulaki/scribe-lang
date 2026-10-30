@@ -40,6 +40,10 @@ starts its C file with a comment such as `/* Link with: -lm */`: add `-lm`
 at the end of the `cc` command. (`--build make` and `--build ninja` do this
 for you.)
 
+The same program also builds as WebAssembly, to run in a browser terminal or
+under Node, with no change to the source: `--target wasm` (see the
+[README](../README.md#run-in-the-browser)).
+
 ## Program shape
 
 - Statements are separated by newlines or `;`, so a short block fits on one
