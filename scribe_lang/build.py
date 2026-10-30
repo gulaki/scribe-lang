@@ -56,7 +56,12 @@ class MakeBuildSystem(BuildSystem):
         # it rebuild (`make clean` removes it).
         side = "".join(f"# Also writes {name}.\n" for name in config.side_outputs)
         return (
-            f"CC ?= {config.compiler}\n"
+            # Make predefines CC (as `cc`), so `CC ?= emcc` would never take
+            # effect. Replace only that built-in default: a CC given in the
+            # environment or on the command line still wins.
+            f"ifeq ($(origin CC),default)\n"
+            f"CC = {config.compiler}\n"
+            f"endif\n"
             f"CFLAGS ?= {flags}\n"
             f"LDFLAGS ?={_joined(config.ldflags)}\n"
             f"LDLIBS ?={' ' + config.ldlibs if config.ldlibs else ''}\n\n"
