@@ -192,3 +192,78 @@ def test_runtime_errors_are_red_when_scribe_color_errors_is_defined(build_scribe
     assert plain.stderr == "t.scribe:2:7: runtime error: integer overflow\n"
     assert red.stderr == "\x1b[31mt.scribe:2:7: runtime error: integer overflow\x1b[0m\n"
     assert plain.returncode != 0 and red.returncode != 0
+
+
+# -- building with emcc: the same program, the same output ---------------------------------
+# Every example is built for node through its generated Makefile and must
+# print exactly what its native build prints. The web shell adds flags
+# (Asyncify, the pty library), so a few examples are built with it too; the
+# browser itself is checked by hand.
+
+def _tools():
+    import shutil
+
+    missing = [tool for tool in ("emcc", "make", "node") if shutil.which(tool) is None]
+    if missing:
+        pytest.skip(f"needs {', '.join(missing)}")
+
+
+def build_with_emcc(source_path, *args):
+    import subprocess
+
+    _tools()
+    assert run_cli(source_path, "--target", "wasm", "--build", "make", *args) == 0
+    folder = source_path.with_suffix("")
+    make = subprocess.run(["make", "-C", str(folder)], capture_output=True, text=True)
+    assert make.returncode == 0, make.stderr
+    return folder
+
+
+def run_node(folder, stdin=""):
+    import subprocess
+
+    return subprocess.run(["node", str(folder / f"{folder.name}.js")], input=stdin,
+                          capture_output=True, text=True, encoding="utf-8", timeout=60)
+
+
+def _example_runs():
+    from test_end_to_end import EXAMPLE_RUNS
+
+    return EXAMPLE_RUNS
+
+
+@pytest.mark.parametrize("name", sorted(_example_runs()))
+def test_every_example_prints_the_same_under_node(tmp_path, name):
+    from conftest import EXAMPLES
+
+    stdin, expected = _example_runs()[name]
+    source_path = tmp_path / f"{name}.scribe"
+    source_path.write_text((EXAMPLES / f"{name}.scribe").read_text(encoding="utf-8"), encoding="utf-8")
+    run = run_node(build_with_emcc(source_path, "--shell", "node"), stdin)
+    assert (run.returncode, run.stdout) == (0, expected), run.stderr
+
+
+@pytest.mark.parametrize("program, message", [
+    ("x = 9223372036854775807\ny = x + 1\n", "2:7: runtime error: integer overflow"),
+    ("n = 0\nprint 10 // n\n", "2:10: runtime error: division by zero"),
+    ("b, e = 2, -1\nprint b ** e\n", "2:9: runtime error: negative exponent"),
+    ("x = 1e300\nprint i64(x)\n", "2:7: runtime error: value out of range for i64"),
+])
+def test_runtime_errors_are_the_same_under_node(tmp_path, program, message):
+    source_path = tmp_path / "crash.scribe"
+    source_path.write_text(program, encoding="utf-8")
+    run = run_node(build_with_emcc(source_path, "--shell", "node"))
+    assert run.returncode != 0
+    # The message is the native one, uncoloured: node's stderr may be a file.
+    assert run.stderr.startswith(f"{source_path}:{message}\n"), run.stderr
+
+
+@pytest.mark.parametrize("name", ["sum_avg", "primes", "booleans"])
+def test_examples_build_for_the_web_shell(tmp_path, name):
+    from conftest import EXAMPLES
+
+    source_path = tmp_path / f"{name}.scribe"
+    source_path.write_text((EXAMPLES / f"{name}.scribe").read_text(encoding="utf-8"), encoding="utf-8")
+    folder = build_with_emcc(source_path)
+    assert (folder / f"{name}.mjs").stat().st_size > 0
+    assert (folder / f"{name}.wasm").read_bytes()[:4] == b"\0asm"
